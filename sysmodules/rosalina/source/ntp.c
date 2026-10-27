@@ -31,6 +31,7 @@
 #include "utils.h"
 #include "minisoc.h"
 #include "ntp.h"
+#include "ifile.h"
 
 #define NUM2BCD(n)          ((n<99) ? (((n/10)*0x10)|(n%10)) : 0x99)
 
@@ -45,6 +46,69 @@
 #ifndef NTP_IP
 #define NTP_IP              MAKE_IPV4(51, 137, 137, 111) // time.windows.com
 #endif
+
+// Parses a dotted IPv4 address ("192.168.1.1"), ignoring a UTF-8 BOM and surrounding whitespace/newlines.
+// Returns false for anything else.
+bool ntpParseIpv4(const char *s, u32 len, u32 *out)
+{
+    u32 i = 0;
+    if (len >= 3 && (u8)s[0] == 0xEF && (u8)s[1] == 0xBB && (u8)s[2] == 0xBF)
+        i = 3;
+    while (i < len && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n'))
+        i++;
+
+    u32 ip = 0, part = 0, nbParts = 0, nbDigits = 0;
+    for (; i <= len; i++)
+    {
+        char c = i < len ? s[i] : '\0';
+        if (c >= '0' && c <= '9' && nbDigits < 3)
+        {
+            part = 10 * part + (c - '0');
+            nbDigits++;
+        }
+        else if (nbDigits > 0 && part <= 255 && nbParts < 4 && (c == '.' || c == '\0' || c == ' ' || c == '\t' || c == '\r' || c == '\n'))
+        {
+            ip = (ip << 8) | part;
+            nbParts++;
+            part = nbDigits = 0;
+            if (c != '.')
+                break;
+        }
+        else
+            return false;
+    }
+
+    // Only whitespace may follow the address
+    for (i++; i < len; i++)
+    {
+        if (s[i] != ' ' && s[i] != '\t' && s[i] != '\r' && s[i] != '\n' && s[i] != '\0')
+            return false;
+    }
+
+    if (nbParts != 4)
+        return false;
+
+    *out = ip;
+    return true;
+}
+
+// Optional override of the NTP server: /luma/ntp_server.txt containing an IPv4 address
+// (upstream request #1969, e.g. for networks that block the default server)
+static u32 ntpGetServerIp(void)
+{
+    IFile file;
+    char buf[64];
+    u64 total = 0;
+    u32 ip;
+
+    if (R_FAILED(IFile_Open(&file, ARCHIVE_SDMC, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, "/luma/ntp_server.txt"), FS_OPEN_READ)))
+        return NTP_IP;
+
+    Result res = IFile_Read(&file, &total, buf, sizeof(buf));
+    IFile_Close(&file);
+
+    return R_SUCCEEDED(res) && ntpParseIpv4(buf, (u32)total, &ip) ? ip : NTP_IP;
+}
 
 // From https://github.com/lettier/ntpclient/blob/master/source/c/main.c
 
@@ -107,7 +171,7 @@ Result ntpGetTimeStamp(u64 *msSince1900, u64 *samplingTick)
 
     // Copy the server's IP address to the server address structure.
 
-    servAddr.sin_addr.s_addr = htonl(NTP_IP);
+    servAddr.sin_addr.s_addr = htonl(ntpGetServerIp());
     // Convert the port number integer to network big-endian style and save it to the server address structure.
 
     servAddr.sin_port = htons(123);

@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2021 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -29,6 +30,7 @@
 #include <3ds/types.h>
 #include <time.h>
 
+bool ntpParseIpv4(const char *s, u32 len, u32 *out);
 Result ntpGetTimeStamp(u64 *msSince1900, u64 *samplingTick);
 Result ntpSetTimeDate(u64 msSince1900, u64 samplingTick);
 Result ntpNullifyUserTimeOffset(void); // not actually used for NTP
