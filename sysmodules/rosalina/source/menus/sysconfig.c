@@ -32,6 +32,8 @@
 #include "draw.h"
 #include "fmt.h"
 #include "utils.h"
+#include "sleep.h"
+#include "minisoc.h"
 #include "ifile.h"
 #include "luminance.h"
 
@@ -53,6 +55,7 @@ Menu sysconfigMenu = {
         { "Set LED master brightness override...", METHOD, .method = &SysConfigMenu_SetLedMasterBrightnessOverride },
         { "Set audio routing...", MENU, .menu = &audioRoutingMenu },
         { "Toggle Wireless", METHOD, .method = &SysConfigMenu_ToggleWireless },
+        { "Sleep options...", METHOD, .method = &SysConfigMenu_SleepOptions },
         { "Toggle Power Button", METHOD, .method=&SysConfigMenu_TogglePowerButton },
         { "Toggle power to card slot", METHOD, .method=&SysConfigMenu_ToggleCardIfPower},
         { "Change screen brightness", METHOD, .method = &SysConfigMenu_ChangeScreenBrightness },
@@ -301,9 +304,12 @@ void SysConfigMenu_ToggleWireless(void)
 
         if(pressed & KEY_A && nwmRunning)
         {
-            nwmExtInit();
-            NWMEXT_ControlWirelessEnabled(!wireless);
-            nwmExtExit();
+            // Only exit after a successful init: an unbalanced nwmExtExit breaks every later nwmExtInit (libctru refcount)
+            if(R_SUCCEEDED(nwmExtInit()))
+            {
+                NWMEXT_ControlWirelessEnabled(!wireless);
+                nwmExtExit();
+            }
         }
         else if(pressed & KEY_B)
             return;
@@ -955,4 +961,55 @@ void SysConfigMenu_ChangeScreenBrightness(void)
         Draw_SetupFramebuffer();
 
     Draw_Unlock();
+}
+
+// LuxiOS sleep options (upstream requests #1905, #2229, #1773). Toggles last until reboot
+void SysConfigMenu_SleepOptions(void)
+{
+    Draw_Lock();
+    Draw_ClearFramebuffer();
+    Draw_FlushFramebuffer();
+    Draw_Unlock();
+
+    do
+    {
+        Draw_Lock();
+        Draw_DrawString(10, 10, COLOR_TITLE, "Sleep options");
+        u32 posY = Draw_DrawString(10, 30, COLOR_WHITE, "A: sleep now (wake with HOME or the lid)");
+        posY = Draw_DrawFormattedString(10, posY + SPACING_Y, COLOR_WHITE, "X: Wi-Fi off while lid is closed:  %s", sleepCutWifiEnabled ? "ON " : "OFF");
+        posY = Draw_DrawFormattedString(10, posY + SPACING_Y, COLOR_WHITE, "Y: ignore lid / sleep switch:      %s", sleepBlockLid ? "ON " : "OFF");
+        posY = Draw_DrawString(10, posY + 2 * SPACING_Y, COLOR_WHITE,
+            "B: go back\n\n"
+            "Wi-Fi off saves battery but stops StreetPass\n"
+            "and SpotPass while asleep.\n"
+            "Ignoring the lid keeps the console awake (and\n"
+            "draining battery) with the lid closed; use it\n"
+            "for a faulty sleep switch.\n"
+            "Both settings reset when you reboot.");
+
+        if (miniSocEnabled)
+            Draw_DrawString(10, posY + SPACING_Y, COLOR_RED, "Sleep is blocked while InputRedirection or\nthe debugger is running.");
+
+        Draw_FlushFramebuffer();
+        Draw_Unlock();
+
+        u32 pressed = waitInputWithTimeout(1000);
+
+        if (pressed & KEY_A)
+        {
+            if (!miniSocEnabled)
+            {
+                sleepNowRequested = true;
+                menuRequestClose();
+                return;
+            }
+        }
+        else if (pressed & KEY_X)
+            sleepCutWifiEnabled = !sleepCutWifiEnabled;
+        else if (pressed & KEY_Y)
+            sleepBlockLid = !sleepBlockLid;
+        else if (pressed & KEY_B)
+            return;
+    }
+    while (!menuShouldExit);
 }

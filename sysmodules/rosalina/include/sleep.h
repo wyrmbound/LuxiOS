@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -29,3 +30,13 @@
 void    Sleep__Init(void);
 void    Sleep__HandleNotification(u32 notifId);
 bool    Sleep__Status(void);
+
+// LuxiOS sleep options. Session-only on purpose (reset on reboot), so a problem on some console can't persist
+extern bool sleepCutWifiEnabled;    ///< Turn Wi-Fi off while the lid is closed (upstream request #1773)
+extern bool sleepBlockLid;          ///< Ignore the lid/sleep switch: deny sleep requests (upstream request #2229)
+extern bool sleepNowRequested;      ///< "Sleep now" chosen in the menu, done once the menu has closed
+extern bool sleepNowPending;        ///< Our own sleep request is in progress (bypasses sleepBlockLid)
+
+void    Sleep__OnShellClosed(void);
+void    Sleep__OnShellOpened(void);
+Result  Sleep__RequestNow(void);

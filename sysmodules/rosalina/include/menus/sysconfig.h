@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -41,6 +42,7 @@ void SysConfigMenu_SetAudioRoutingAuto(void);
 void SysConfigMenu_SetAudioRoutingHeadphones(void);
 void SysConfigMenu_SetAudioRoutingSpeakers(void);
 void SysConfigMenu_ToggleWireless(void);
+void SysConfigMenu_SleepOptions(void);
 void SysConfigMenu_TogglePowerButton(void);
 void SysConfigMenu_ControlWifi(void);
 void SysConfigMenu_DisableForcedWifiConnection(void);

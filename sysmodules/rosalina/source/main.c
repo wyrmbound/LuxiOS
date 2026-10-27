@@ -154,8 +154,10 @@ static void handleSleepNotification(u32 notificationId)
     {
         case PTMNOTIFID_SLEEP_REQUESTED:
             menuShouldExit = true;
+            // deny sleep request if we have network stuff running, or the lid/switch is set to be ignored (unless
+            // the request is our own "Sleep now")
             if (ptmOk)
-                PTMSYSM_ReplyToSleepQuery(miniSocEnabled); // deny sleep request if we have network stuff running
+                PTMSYSM_ReplyToSleepQuery(miniSocEnabled || (sleepBlockLid && !sleepNowPending));
             break;
         case PTMNOTIFID_GOING_TO_SLEEP:
         case PTMNOTIFID_SLEEP_ALLOWED:
@@ -166,6 +168,7 @@ static void handleSleepNotification(u32 notificationId)
             break;
         case PTMNOTIFID_SLEEP_DENIED:
         case PTMNOTIFID_FULLY_AWAKE:
+            sleepNowPending = false;
             menuShouldExit = false;
             break;
         default:
@@ -187,9 +190,11 @@ static void handleShellNotification(u32 notificationId)
         // and shell close, then NS demuxes it and fires 0x213 and 0x214.
         handleShellOpened();
         menuShouldExit = false;
+        Sleep__OnShellOpened();
     } else {
         // Shell closed
         menuShouldExit = true;
+        Sleep__OnShellClosed();
     }
 
 }

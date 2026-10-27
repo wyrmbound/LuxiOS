@@ -33,6 +33,7 @@
 #include "ifile.h"
 #include "menus.h"
 #include "utils.h"
+#include "sleep.h"
 #include "luma_config.h"
 #include "menus/n3ds.h"
 #include "menus/cheats.h"
@@ -391,6 +392,14 @@ void menuThreadMain(void)
             menuUpdateModsStatus();
             menuShow(&rosalinaMenu);
             menuLeave();
+
+            // "Sleep now" is requested with the game running again, as it has to answer the sleep query
+            if (sleepNowRequested)
+            {
+                sleepNowRequested = false;
+                svcSleepThread(100 * 1000 * 1000LL);
+                Sleep__RequestNow();
+            }
         }
 
         if (saveSettingsRequest) {
