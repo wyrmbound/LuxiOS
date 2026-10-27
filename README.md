@@ -19,7 +19,15 @@
 - **Cheats:** handle more than 255 cheats (the counter used to wrap); line indexes past 255 no longer cause infinite loops; type-E codes are bounds-checked; very long lines are always terminated.
 - **Plugin loader (3GX):** checks header, author, title and target sizes against the file and memory block; rejects truncated headers; bounds the error message; always terminates the `user_param.bin` path; empty plugin menus no longer index out of bounds.
 - **GDB stub:** rejects overlong host-I/O paths before decoding them into a stack buffer.
-- **config.ini:** written with a new bounded `snprintf` instead of sprintf-then-check (this was the old FIXME). Floats are saved correctly: `1.10000001` used to become `1.01`, and brightness `-0.5` used to become `0.5`. Menu combo strings no longer overflow 128-byte buffers.
+- **config.ini:** written with a new bounded `snprintf` instead of sprintf-then-check (this was the old FIXME). Floats are saved correctly: `1.10000001` used to become `1.01`, and brightness `-0.5` used to become `0.5`. Negative values are read correctly: `-1.5` used to load as `+0.5` and `-1` as `+1`. Saving from the boot config menu no longer wipes settings the menu doesn't show. Menu combo strings no longer overflow 128-byte buffers.
+- **Network time (NTP):** no longer freezes the console if the time server's reply is lost (likely upstream #2195); the synced clock is no longer up to 1 s fast; times after 2036 are handled.
+- **Community fixes merged from open upstream pull requests:** Local Play and StreetPass work again after Rosalina's networking was used ([#2262](https://github.com/LumaTeam/Luma3DS/pull/2262)), and opening the menu no longer freezes some games while the GPU is busy ([#2232](https://github.com/LumaTeam/Luma3DS/pull/2232), with a time limit added to its wait loop).
+
+**New features**
+- **Peek at the game:** hold <kbd>Y</kbd> in the LuxiOS menu to see the game's bottom screen; let go to return. The game stays paused. (Requested upstream in [#2224](https://github.com/LumaTeam/Luma3DS/issues/2224).)
+- **Screenshots sorted per game:** saved to `/luma/screenshots/<TitleID>/` (requested upstream in [#1627](https://github.com/LumaTeam/Luma3DS/issues/1627)).
+- **Pick which game update loads:** put a 2-byte little-endian `remaster.bin` in `/luma/titles/<TitleID>/` (with game patching on) to force a specific update version. Useful when mods target one version. Based on upstream PR [#2170](https://github.com/LumaTeam/Luma3DS/pull/2170).
+- **Kept up to date with Luma3DS:** includes upstream's late-October 2026 work: audio routing and stereo volume balance, LED brightness override, date and time in the menu, per-channel screen filters, UPS patches and much faster IPS patches.
 
 **Look and feel**
 - LuxiOS name in the boot config menu, chainloader, the in-game menu (formerly "Rosalina menu"), and the credits.
@@ -36,7 +44,7 @@ Luxi is an original electric lion cub made for this project: gold face, lightnin
 
 ## Building
 
-Same as [Luma3DS](https://github.com/LumaTeam/Luma3DS#building-from-source): install devkitARM + libctru (the `3ds-dev` package via dkp-pacman), [makerom](https://github.com/3DSGuy/Project_CTR) and [firmtool](https://github.com/TuxSH/firmtool), then run `make` to get `boot.firm`. Host tests (any clang/gcc): `luxios-tools/tests/run_fmt_test.sh` and `run_float_test.sh`.
+Same as [Luma3DS](https://github.com/LumaTeam/Luma3DS#building-from-source): install devkitARM + libctru (the `3ds-dev` package via dkp-pacman), [makerom](https://github.com/3DSGuy/Project_CTR) and [firmtool](https://github.com/TuxSH/firmtool), then run `make` to get `boot.firm`. Host tests (any clang/gcc): `luxios-tools/tests/run_fmt_test.sh`, `run_float_test.sh` and `run_date_test.sh`.
 
 ## Credits and license
 
