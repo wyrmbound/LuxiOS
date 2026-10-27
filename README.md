@@ -5,7 +5,7 @@
 *A fork of [Luma3DS](https://github.com/LumaTeam/Luma3DS) for the Nintendo 3DS family (Old and New 3DS/2DS), with bug fixes and a new look.*
 
 > [!WARNING]
-> **Not yet tested on real hardware.** Every change here builds cleanly with devkitARM, and the formatter and config fixes pass host-side unit tests. Nobody has booted this build on a console yet. Keep a known-good `boot.firm` from upstream Luma3DS on hand. Luma3DS itself can't brick a console, since boot9strap keeps loading `boot.firm` from the SD card and you can swap it back on a PC.
+> **Not yet tested on real hardware.** See [TESTING.md](TESTING.md) for the test checklist. Every change here builds cleanly with devkitARM, and the formatter and config fixes pass host-side unit tests. Nobody has booted this build on a console yet. Keep a known-good `boot.firm` from upstream Luma3DS on hand. Luma3DS itself can't brick a console, since boot9strap keeps loading `boot.firm` from the SD card and you can swap it back on a PC.
 
 > [!NOTE]
 > **AI-assisted.** The code changes, artwork and this README were written with an AI coding assistant (Claude). Each commit says what changed and why.
@@ -44,6 +44,10 @@
 - **Backups:** one failed copy no longer skips the rest (OTP and bootrom backups included).
 - **Process manager:** a failed launch could leave PM's lock broken (later hang); a CPU-time table lookup always used its first entry.
 - **Smaller fixes:** Download Play crash on unknown versions, a 4-byte write past the kernel in a New 3DS patch, prototype-firmware support (stack overflow, wrong key loads).
+- **Plugin service:** any app could crash Rosalina by asking for the plugin path before a plugin loaded; a plugin loading while the previous one was being cleaned up could have its memory freed; client buffer sizes were ignored.
+- **Screen filters:** the maximum colour temperature (25100K) read past its table and could black out the screen.
+- **Boot timing:** the bootloader's timer misbehaved after ~32 s (splash and screen power-up waits); rebooting into DS/GBA games cut long launch paths at 41 characters.
+- **Kernel extension:** address lookups could read past a process's page table.
 - **Shutdown:** Rosalina's service loop could spin forever during cleanup if an unsubscribe failed.
 - **Network time (NTP):** no longer freezes the console if the time server's reply is lost (likely upstream #2195); the synced clock is no longer up to 1 s fast; times after 2036 are handled.
 - **Community fixes merged from open upstream pull requests:** Local Play and StreetPass work again after Rosalina's networking was used ([#2262](https://github.com/LumaTeam/Luma3DS/pull/2262)), and opening the menu no longer freezes some games while the GPU is busy ([#2232](https://github.com/LumaTeam/Luma3DS/pull/2232), with a time limit added to its wait loop).
@@ -53,6 +57,8 @@
 - **Always-on cheats:** start a cheat's name with `*` in your cheats file (for example `[*60 FPS]`) and it turns on by itself when the game starts, with no need to open the menu. You can still switch it off in *Cheats*. (Requested upstream in [#1619](https://github.com/LumaTeam/Luma3DS/issues/1619).)
 - **Close a frozen game or app:** in *Process list*, select it and press <kbd>X</kbd>, then <kbd>X</kbd> again to confirm. Only games and homebrew can be closed this way, never system processes. (Requested upstream in [#2134](https://github.com/LumaTeam/Luma3DS/issues/2134).)
 - **Choose the time server:** put an IPv4 address (like `192.168.1.1`) in `/luma/ntp_server.txt` to sync the clock from that server instead of time.windows.com. (Requested upstream in [#1969](https://github.com/LumaTeam/Luma3DS/issues/1969).)
+- **Sleep options** (System configuration → Sleep options): *sleep now* (wake with HOME or the lid; upstream [#1905](https://github.com/LumaTeam/Luma3DS/issues/1905)), *ignore the lid / sleep switch* for faulty switches ([#2229](https://github.com/LumaTeam/Luma3DS/issues/2229)), and *Wi-Fi off while the lid is closed* to save battery ([#1773](https://github.com/LumaTeam/Luma3DS/issues/1773); stops StreetPass/SpotPass while asleep). The two toggles reset on reboot.
+- **One-screen screenshots:** hold <kbd>L</kbd> (top only) or <kbd>R</kbd> (bottom only) when choosing *Take screenshot* ([#1801](https://github.com/LumaTeam/Luma3DS/issues/1801)).
 - **See your active mods:** the LuxiOS menu shows which mods the running game has (e.g. "Mods: romfs, code"), or warns if mod files exist but game patching is off. (Requested upstream in [#2093](https://github.com/LumaTeam/Luma3DS/issues/2093).)
 - **Screenshots sorted per game:** saved to `/luma/screenshots/<TitleID>/` (requested upstream in [#1627](https://github.com/LumaTeam/Luma3DS/issues/1627)).
 - **Pick which game update loads:** put a 2-byte little-endian `remaster.bin` in `/luma/titles/<TitleID>/` (with game patching on) to force a specific update version. Useful when mods target one version. Based on upstream PR [#2170](https://github.com/LumaTeam/Luma3DS/pull/2170).
