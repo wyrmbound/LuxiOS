@@ -5,7 +5,10 @@
 *A fork of [Luma3DS](https://github.com/LumaTeam/Luma3DS) for the Nintendo 3DS family (Old and New 3DS/2DS), with bug fixes and a new look.*
 
 > [!WARNING]
-> **Not yet tested on real hardware.** See [TESTING.md](TESTING.md) for the test checklist. Every change here builds cleanly with devkitARM, and the formatter and config fixes pass host-side unit tests. Nobody has booted this build on a console yet. Keep a known-good `boot.firm` from upstream Luma3DS on hand. Luma3DS itself can't brick a console, since boot9strap keeps loading `boot.firm` from the SD card and you can swap it back on a PC.
+> **Beta.** Tested on an **Old 2DS**: it boots, the LuxiOS menu works, power off and reboot work, and it has been stable in everyday use with homebrew such as FBI and Anemone. It hasn't been tested on New 3DS/2DS models yet, and many features in [TESTING.md](TESTING.md) haven't been checked on a console. Every change builds cleanly with devkitARM and the parsers pass host-side unit tests. Keep a known-good `boot.firm` from upstream Luma3DS on hand. Luma3DS itself can't brick a console, since boot9strap keeps loading `boot.firm` from the SD card and you can swap it back on a PC.
+
+> [!TIP]
+> Newly installed apps show up gift-wrapped on the HOME Menu until the console shuts down cleanly. The menu's **Reboot** restarts too quickly for the HOME Menu to save, the same as in Luma3DS ([upstream #831](https://github.com/LumaTeam/Luma3DS/issues/831)), so after installing something, use **Power off** once.
 
 > [!NOTE]
 > **AI-assisted.** The code changes, artwork and this README were written with an AI coding assistant (Claude). Each commit says what changed and why.

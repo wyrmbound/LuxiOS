@@ -1,6 +1,8 @@
 # LuxiOS hardware test checklist
 
-LuxiOS builds cleanly and its parsers pass host tests, but **nothing has been run on a real console yet**.
+LuxiOS builds cleanly and its parsers pass host tests. It has been **tested on an Old 2DS** (boot, the menu, power
+off/reboot and everyday use with FBI and Anemone). It hasn't been tested on New 3DS/2DS models, and most sections below
+still need someone to go through them.
 Test in this order: each section assumes the ones above it passed.
 
 **Before you start:** keep your current `boot.firm` (upstream Luma3DS) on your PC. If anything goes wrong, put
