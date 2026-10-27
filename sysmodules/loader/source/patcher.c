@@ -354,10 +354,10 @@ bool readSysmoduleCxiNcchHeader(Ncch *outNcchHeader, IFile *file)
 bool readSysmoduleCxiExHeaderInfo(ExHeader_Info *outExhi, const Ncch *ncchHeader, IFile *file)
 {
     u64 total = 0;
-    u32 size = ncchHeader->exHeaderSize;
-    if (size < sizeof(ExHeader_Info))
+    if (ncchHeader->exHeaderSize < sizeof(ExHeader_Info))
         return false;
-    return R_SUCCEEDED(IFile_ReadAt(file, &total, outExhi, sizeof(Ncch), size)) && total == size;
+    // Only the ExHeader_Info part is wanted; reading exHeaderSize bytes would overflow outExhi
+    return R_SUCCEEDED(IFile_ReadAt(file, &total, outExhi, sizeof(Ncch), sizeof(ExHeader_Info))) && total == sizeof(ExHeader_Info);
 }
 
 bool readSysmoduleCxiCode(u8 *outCode, u32 *outSize, u32 maxSize, IFile *file, const Ncch *ncchHeader)

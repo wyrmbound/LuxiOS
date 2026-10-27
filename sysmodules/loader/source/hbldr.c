@@ -378,7 +378,8 @@ void hbldrHandleCommands(void *ctx)
                 break;
             }
             size_t inSize = cmdbuf[1] >> 14;
-            inSize = inSize > PATH_MAX ? inSize : PATH_MAX;
+            // Allow one unit more than PATH_MAX so that overlong paths are detected below
+            inSize = inSize > PATH_MAX + 1 ? PATH_MAX + 1 : inSize;
             ssize_t units = utf8_to_utf16(hbldrTarget, (const uint8_t*)cmdbuf[2], inSize);
             if (units < 0 || units > PATH_MAX)
             {
@@ -400,7 +401,7 @@ void hbldrHandleCommands(void *ctx)
                 break;
             }
             size_t inSize = cmdbuf[1] >> 14;
-            inSize = inSize > ARGVBUF_SIZE ? inSize : ARGVBUF_SIZE;
+            inSize = inSize > ARGVBUF_SIZE ? ARGVBUF_SIZE : inSize;
             memcpy(ldrArgvBuf, (const u8 *)cmdbuf[2], inSize);
             cmdbuf[0] = IPC_MakeHeader(3, 1, 0);
             cmdbuf[1] = 0;

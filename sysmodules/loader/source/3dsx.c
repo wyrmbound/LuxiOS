@@ -148,6 +148,7 @@ Handle Ldr_CodesetFrom3dsx(const char* name, u32* codePages, u32 baseAddr, IFile
     readOffset += hdr.rodataSegSize;
 
     // Read the data segment
+    SEC_ASSERT(hdr.bssSize <= hdr.dataSegSize);
     u32 dataLoadSegSize = hdr.dataSegSize - hdr.bssSize;
     if (IFile_Read2(file, d.segPtrs[2], dataLoadSegSize, readOffset) != dataLoadSegSize)
     {
@@ -161,11 +162,11 @@ Handle Ldr_CodesetFrom3dsx(const char* name, u32* codePages, u32 baseAddr, IFile
     {
         for (j = 0; j < nRelocTables; j ++)
         {
-            int nRelocs = extraPage[i*nRelocTables + j];
+            u32 nRelocs = extraPage[i*nRelocTables + j];
             if (j >= (sizeof(_3DSX_RelocHdr)/4))
             {
                 // Not using this header
-                readOffset += nRelocs;
+                readOffset += nRelocs * sizeof(_3DSX_Reloc);
                 continue;
             }
 
