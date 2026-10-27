@@ -80,10 +80,10 @@ typedef struct CheatState
         u8 data2Mode : 1;
         u8 floatMode : 1;
     };
-    u8 typeELine;
+    u32 typeELine;
     u8 typeEIdx;
 
-    s8 loopLine;
+    s32 loopLine;
     u32 loopCount;
 
     u32 ifStack;
@@ -94,7 +94,7 @@ typedef struct CheatState
 } CheatState;
 
 CheatState cheat_state = { 0 };
-u8 cheatCount = 0;
+s32 cheatCount = 0;
 u64 cheatTitleInfo = -1ULL;
 u64 cheatRngState = 0;
 
@@ -1285,6 +1285,9 @@ static u32 Cheat_ApplyCheat(const Handle processHandle, CheatDescription* const 
             {
                 u32 beginOffset = (arg0 & 0x0FFFFFFF);
                 u32 count = arg1;
+                // The data lines must all exist in this cheat
+                u32 dataLines = count / 8 + (count % 8 != 0);
+                if (dataLines >= cheat->codesCount - cheat_state.index) return 0;
                 cheat_state.typeELine = cheat_state.index;
                 cheat_state.typeEIdx = 7;
                 for (u32 i = 0; i < count; i++)
@@ -1751,7 +1754,7 @@ static Result Cheat_ReadLine(BufferedFile* file, char* line, u32 lineSize)
     u32 idx = 0;
     u64 total = 0;
     bool lastWasCarriageReturn = false;
-    while (R_SUCCEEDED(res) && idx < lineSize)
+    while (R_SUCCEEDED(res) && idx < lineSize - 1)
     {
         res = BufferedFile_Read(file, &total, line + idx, 1);
         if (total == 0)
@@ -1789,6 +1792,7 @@ static Result Cheat_ReadLine(BufferedFile* file, char* line, u32 lineSize)
             idx++;
         }
     }
+    line[idx] = '\0'; // Line was too long and got truncated
     return res;
 }
 
