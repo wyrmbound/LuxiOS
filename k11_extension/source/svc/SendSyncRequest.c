@@ -29,9 +29,53 @@
 #include "svc/SendSyncRequest.h"
 #include "ipc.h"
 
+static inline bool isNdmuSession(const SessionInfo *info)
+{
+    return info != NULL && strcmp(info->name, "ndm:u") == 0;
+}
+
 static inline bool isNdmuWorkaround(const SessionInfo *info, u32 pid)
 {
-    return info != NULL && strcmp(info->name, "ndm:u") == 0 && hasStartedRosalinaNetworkFuncs && pid >= nbSection0Modules;
+    return isNdmuSession(info) && hasStartedRosalinaNetworkFuncs && pid >= nbSection0Modules;
+}
+
+// Pids whose ndm:u SuspendScheduler was skipped. Only their matching ResumeScheduler is skipped, whatever the network
+// state is by then: deciding each call on the live flag could split a pair when Rosalina's network features start or
+// stop in between (unmatched Resume, or ndm's scheduler left suspended)
+static u32 ndmSuspendSkippedPids[16];
+
+static bool ndmRecordSkippedSuspend(u32 pid)
+{
+    bool ok = false;
+    KRecursiveLock__Lock(criticalSectionLock);
+    for(u32 i = 0; i < sizeof(ndmSuspendSkippedPids) / sizeof(ndmSuspendSkippedPids[0]) && !ok; i++)
+    {
+        if(ndmSuspendSkippedPids[i] == pid)
+            ok = true; // already recorded (nested suspend): one entry is enough
+        else if(ndmSuspendSkippedPids[i] == 0)
+        {
+            ndmSuspendSkippedPids[i] = pid;
+            ok = true;
+        }
+    }
+    KRecursiveLock__Unlock(criticalSectionLock);
+    return ok; // table full: don't skip, let the real Suspend through (and its Resume)
+}
+
+static bool ndmTakeSkippedSuspend(u32 pid)
+{
+    bool found = false;
+    KRecursiveLock__Lock(criticalSectionLock);
+    for(u32 i = 0; i < sizeof(ndmSuspendSkippedPids) / sizeof(ndmSuspendSkippedPids[0]) && !found; i++)
+    {
+        if(ndmSuspendSkippedPids[i] == pid && pid != 0)
+        {
+            ndmSuspendSkippedPids[i] = 0;
+            found = true;
+        }
+    }
+    KRecursiveLock__Unlock(criticalSectionLock);
+    return found;
 }
 
 Result SendSyncRequestHook(Handle handle)
@@ -156,7 +200,7 @@ Result SendSyncRequestHook(Handle handle)
                 if(!hasStartedRosalinaNetworkFuncs)
                     break;
                 SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession);
-                skip = isNdmuWorkaround(info, pid); // SuspendScheduler
+                skip = isNdmuWorkaround(info, pid) && ndmRecordSkippedSuspend(pid); // SuspendScheduler
                 if(skip)
                     cmdbuf[1] = 0;
                 break;
@@ -164,10 +208,8 @@ Result SendSyncRequestHook(Handle handle)
 
             case 0x90000:
             {
-                if(!hasStartedRosalinaNetworkFuncs)
-                    break;
                 SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession);
-                if(isNdmuWorkaround(info, pid)) // ResumeScheduler
+                if(isNdmuSession(info) && ndmTakeSkippedSuspend(pid)) // ResumeScheduler matching a skipped Suspend
                 {
                     cmdbuf[0] = 0x90040;
                     cmdbuf[1] = 0;
@@ -206,7 +248,7 @@ Result SendSyncRequestHook(Handle handle)
                         u32 command = cmdbuf[3];
 
                         if ((plgStatus == PLG_CFG_RUNNING && command == 3) // COMMAND_RESPONSE
-                        || (plgStatus == PLG_CFG_INHOME && (command >= 10 && command <= 12)))  // COMMAND_WAKEUP_BY_EXIT || COMMAND_WAKEUP_BY_PAUSE
+                        || (plgStatus == PLG_CFG_INHOME && (command == 1 || (command >= 10 && command <= 15) || command == 17)))  // any APTCMD_WAKEUP* (not DSP sleep/wake etc.: upstream's ||-condition matched every command)
                             PLG_SignalEvent(PLG_CFG_HOME_EVENT);
                     }
                 }

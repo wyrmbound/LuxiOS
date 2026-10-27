@@ -290,7 +290,10 @@ void doLangEmuVersionTitleRedirect(u32 *cmdbuf)
     static const u32 cverTidLow[7] = { 0x00017202, 0x00017302, 0x00017102, 0x00017202, 0x00017402, 0x00017502, 0x00017602 };
 
     // OpenFileDirectly on ARCHIVE_SAVEDATA_AND_CONTENT, with a 16-byte binary archive path {tidLow, tidHigh, mediatype, 0}
-    if(cmdbuf[2] != 0x2345678A || cmdbuf[3] != 1 || cmdbuf[4] != 16 || cmdbuf[9] != ((16 << 14) | (2 << 10) | 2) || realRegion >= 7)
+    // cmdbuf[3] is the archive path type: PATH_BINARY = 2. AUS consoles: the right version title isn't certain
+    // (libctru itself maps "AUS" to the JPN titles), so don't redirect there
+    if(cmdbuf[2] != 0x2345678A || cmdbuf[3] != 2 || cmdbuf[4] != 16 || cmdbuf[9] != ((16 << 14) | (2 << 10) | 2) ||
+       realRegion >= 7 || realRegion == 3)
         return;
 
     u32 path[4];
