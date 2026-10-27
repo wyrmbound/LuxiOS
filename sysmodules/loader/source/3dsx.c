@@ -78,8 +78,11 @@ bool Ldr_Get3dsxSize(u32* pSize, IFile *file)
     SEC_ASSERT(segSizes[1] >= hdr.rodataSegSize);
     SEC_ASSERT(segSizes[2] >= hdr.dataSegSize);
 
-    // TODO: Check int overflow
-    *pSize = segSizes[0] + segSizes[1] + segSizes[2] + 0x1000; // One extra page reserved for settings/etc
+    u32 totalSize;
+    SEC_ASSERT(!__builtin_add_overflow(segSizes[0], segSizes[1], &totalSize));
+    SEC_ASSERT(!__builtin_add_overflow(totalSize, segSizes[2], &totalSize));
+    SEC_ASSERT(!__builtin_add_overflow(totalSize, 0x1000, &totalSize)); // One extra page reserved for settings/etc
+    *pSize = totalSize;
 
     return true;
 }
