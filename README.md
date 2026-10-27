@@ -31,6 +31,9 @@
 
 **New features**
 - **Peek at the game:** hold <kbd>Y</kbd> in the LuxiOS menu to see the game's bottom screen; let go to return. The game stays paused. (Requested upstream in [#2224](https://github.com/LumaTeam/Luma3DS/issues/2224).)
+- **Always-on cheats:** start a cheat's name with `*` in your cheats file (for example `[*60 FPS]`) and it turns on by itself when the game starts, with no need to open the menu. You can still switch it off in *Cheats*. (Requested upstream in [#1619](https://github.com/LumaTeam/Luma3DS/issues/1619).)
+- **Close a frozen game or app:** in *Process list*, select it and press <kbd>X</kbd>, then <kbd>X</kbd> again to confirm. Only games and homebrew can be closed this way, never system processes. (Requested upstream in [#2134](https://github.com/LumaTeam/Luma3DS/issues/2134).)
+- **Choose the time server:** put an IPv4 address (like `192.168.1.1`) in `/luma/ntp_server.txt` to sync the clock from that server instead of time.windows.com. (Requested upstream in [#1969](https://github.com/LumaTeam/Luma3DS/issues/1969).)
 - **Screenshots sorted per game:** saved to `/luma/screenshots/<TitleID>/` (requested upstream in [#1627](https://github.com/LumaTeam/Luma3DS/issues/1627)).
 - **Pick which game update loads:** put a 2-byte little-endian `remaster.bin` in `/luma/titles/<TitleID>/` (with game patching on) to force a specific update version. Useful when mods target one version. Based on upstream PR [#2170](https://github.com/LumaTeam/Luma3DS/pull/2170).
 - **Kept up to date with Luma3DS:** includes upstream's late-October 2026 work: audio routing and stereo volume balance, LED brightness override, date and time in the menu, per-channel screen filters, UPS patches and much faster IPS patches.
@@ -50,7 +53,7 @@ Luxi is an original electric lion cub made for this project: gold face, lightnin
 
 ## Building
 
-Same as [Luma3DS](https://github.com/LumaTeam/Luma3DS#building-from-source): install devkitARM + libctru (the `3ds-dev` package via dkp-pacman), [makerom](https://github.com/3DSGuy/Project_CTR) and [firmtool](https://github.com/TuxSH/firmtool), then run `make` to get `boot.firm`. Host tests (any clang/gcc): `luxios-tools/tests/run_fmt_test.sh`, `run_float_test.sh` and `run_date_test.sh`.
+Same as [Luma3DS](https://github.com/LumaTeam/Luma3DS#building-from-source): install devkitARM + libctru (the `3ds-dev` package via dkp-pacman), [makerom](https://github.com/3DSGuy/Project_CTR) and [firmtool](https://github.com/TuxSH/firmtool), then run `make` to get `boot.firm`. Host tests (any clang/gcc): `luxios-tools/tests/run_fmt_test.sh`, `run_float_test.sh`, `run_date_test.sh` and `run_ntp_ip_test.sh`.
 
 ## Credits and license
 
