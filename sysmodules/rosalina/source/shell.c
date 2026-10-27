@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2023 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -34,6 +35,10 @@ void handleShellOpened(void)
 {
     // Somtimes this is called before Rosalina thread main executes,
     // sometimes not... how fun :))
+    // It runs on both the notification thread and the menu thread, so serialize it: both paths share the
+    // cdc:CHK handle slot and the screen filter tables. (1 = unlocked, same as LightLock_Init)
+    static LightLock lock = 1;
+    LightLock_Lock(&lock);
 
     // We need to check here if GSP has done its init stuff, in particular
     // clock and reset, otherwise we'll cause core1 to be in a waitstate
@@ -44,4 +49,6 @@ void handleShellOpened(void)
 
     // Volume override, audio routing, LED master brightness override
     SysConfigMenu_RestoreSettings();
+
+    LightLock_Unlock(&lock);
 }

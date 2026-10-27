@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2021 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -440,7 +441,7 @@ void SysConfigMenu_ControlWifi(void)
     Draw_Unlock();
 
     u32 slot = 0;
-    char ssids[3][32] = {{0}};
+    char ssids[3][32 + 1] = {{0}}; // SSIDs can be exactly 32 chars, with no terminator
 
     Result resInit = acInit();
     for (u32 i = 0; i < 3; i++)
@@ -512,6 +513,8 @@ void SysConfigMenu_DisableForcedWifiConnection(void)
         Draw_Lock();
         Draw_DrawString(10, 10, COLOR_TITLE, "System configuration menu");
         Draw_DrawString(10, 30, COLOR_WHITE, "Forced connection successfully disabled.\nNote: auto-connection may remain broken.");
+        Draw_FlushFramebuffer();
+        Draw_Unlock();
 
         u32 pressed = waitInputWithTimeout(1000);
         if(pressed & KEY_B)

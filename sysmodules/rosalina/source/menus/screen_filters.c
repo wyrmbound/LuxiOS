@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2017-2018 Sono (https://github.com/MarcuzD), panicbit
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -427,9 +428,10 @@ static void ScreenFiltersMenu_ApplyColorSettings(bool top)
     __asm__ ("" : "+r"(magicBits));
     #define BLUE(i) ((u32)__usat((s32)(ScreenFiltersMenu_FloatToBits(gammaTable[i]) - magicBits), 8))
 
-    // One XOR implements 255 - x in all three byte lanes, with no per-channel subtraction or per-entry branch.
-    // Top 8 bits are ignored
-    u32 invertMask = filter->invert ? 0xFFFFFF : 0;
+    // Invert the input level, as before per-channel filters: 255 - i == i ^ 255 for 0 <= i <= 255, so this stays
+    // one XOR per entry. (XORing the output instead also inverted the color temperature/contrast/gamma result,
+    // so e.g. "invert + warm" gave plain white instead of warm white)
+    u32 invertIdx = filter->invert ? 255 : 0;
 
     // Wait for VBlank as it's the only safe time to update the unlatched PDC LUT.
     // (spinwait - TODO tech debt). We use bottom VCount as there is only one possible
@@ -458,10 +460,11 @@ static void ScreenFiltersMenu_ApplyColorSettings(bool top)
     {
         for (u32 i = 0; i < 256; i++)
         {
-            u32 r = srgbTbl[redGreenBytes[4 * i + 0]][0];
-            u32 g = srgbTbl[redGreenBytes[4 * i + 1]][1];
-            u32 b = srgbTbl[BLUE(i)][2];
-            *lutElem = ((b << 16) | (g << 8) | r) ^ invertMask;
+            u32 j = i ^ invertIdx;
+            u32 r = srgbTbl[redGreenBytes[4 * j + 0]][0];
+            u32 g = srgbTbl[redGreenBytes[4 * j + 1]][1];
+            u32 b = srgbTbl[BLUE(j)][2];
+            *lutElem = (b << 16) | (g << 8) | r;
         }
     }
     else
@@ -470,10 +473,11 @@ static void ScreenFiltersMenu_ApplyColorSettings(bool top)
         // to reduce loop overhead while preserving the order of the volatile writes to the hardware LUT
         for (u32 i = 0; i < 256; i += 2)
         {
-            u32 rg0 = packedRedGreen[i] & 0xFFFF, b0 = BLUE(i);
-            u32 rg1 = packedRedGreen[i + 1] & 0xFFFF, b1 = BLUE(i + 1);
-            *lutElem = ((b0 << 16) | rg0) ^ invertMask;
-            *lutElem = ((b1 << 16) | rg1) ^ invertMask;
+            u32 j0 = i ^ invertIdx, j1 = (i + 1) ^ invertIdx;
+            u32 rg0 = packedRedGreen[j0] & 0xFFFF, b0 = BLUE(j0);
+            u32 rg1 = packedRedGreen[j1] & 0xFFFF, b1 = BLUE(j1);
+            *lutElem = (b0 << 16) | rg0;
+            *lutElem = (b1 << 16) | rg1;
         }
     }
 

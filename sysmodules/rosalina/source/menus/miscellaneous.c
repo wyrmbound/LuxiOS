@@ -185,8 +185,14 @@ void MiscellaneousMenu_ChangeMenuCombo(void)
 
     posY = Draw_DrawFormattedString(10, 30, COLOR_WHITE, "The current menu combo is:  %s", comboStrOrig);
     posY = Draw_DrawString(10, posY + SPACING_Y, COLOR_WHITE, "Please enter the new combo:");
+    Draw_FlushFramebuffer();
+    Draw_Unlock(); // don't hold the draw lock while waiting (blocks errdisp and shutdown)
 
-    menuCombo = waitCombo();
+    // waitCombo returns 0 if interrupted (e.g. lid closed); a 0 combo would reopen the menu nonstop
+    u32 newCombo = waitCombo();
+    if (newCombo == 0)
+        return;
+    menuCombo = newCombo;
     LumaConfig_ConvertComboToString(comboStr, menuCombo);
 
     do
@@ -334,10 +340,10 @@ void MiscellaneousMenu_UpdateTimeDateNtp(void)
     res = srvIsServiceRegistered(&isSocURegistered, "soc:U");
     cantStart = R_FAILED(res) || !isSocURegistered;
 
-    int dt = 12*60 + lastNtpTzOffset;
-    int utcOffset = dt / 60;
-    int utcOffsetMinute = dt%60;
-    int absOffset;
+    // Work in total minutes: the old hour + positive-minute split displayed and applied negative
+    // offsets with minutes inconsistently (UTC-03:30 showed as -0430; choosing "-0330" applied -02:30)
+    int tz = lastNtpTzOffset;
+    int absTz;
 
     Draw_Lock();
     Draw_ClearFramebuffer();
@@ -349,27 +355,28 @@ void MiscellaneousMenu_UpdateTimeDateNtp(void)
         Draw_Lock();
         Draw_DrawString(10, 10, COLOR_TITLE, "Miscellaneous options menu");
 
-        absOffset = utcOffset - 12;
-        absOffset = absOffset < 0 ? -absOffset : absOffset;
-        posY = Draw_DrawFormattedString(10, 30, COLOR_WHITE, "Current UTC offset:  %c%02d%02d", utcOffset < 12 ? '-' : '+', absOffset, utcOffsetMinute);
+        absTz = tz < 0 ? -tz : tz;
+        posY = Draw_DrawFormattedString(10, 30, COLOR_WHITE, "Current UTC offset:  %c%02d%02d", tz < 0 ? '-' : '+', absTz / 60, absTz % 60);
         posY = Draw_DrawFormattedString(10, posY + SPACING_Y, COLOR_WHITE, "Use DPAD Left/Right to change hour offset.\nUse DPAD Up/Down to change minute offset.\nPress A when done.") + SPACING_Y;
 
         Draw_FlushFramebuffer();
         Draw_Unlock();
 
         input = waitInput();
-        if(input & KEY_LEFT) utcOffset = (27 + utcOffset - 1) % 27; // ensure utcOffset >= 0
-        if(input & KEY_RIGHT) utcOffset = (utcOffset + 1) % 27;
-        if(input & KEY_UP) utcOffsetMinute = (utcOffsetMinute + 1) % 60;
-        if(input & KEY_DOWN) utcOffsetMinute = (60 + utcOffsetMinute - 1) % 60;
+        if(input & KEY_LEFT) tz -= 60;
+        if(input & KEY_RIGHT) tz += 60;
+        if(input & KEY_UP) tz += 1;
+        if(input & KEY_DOWN) tz -= 1;
+        // UTC-12:00 to UTC+14:00
+        if(tz < -12 * 60) tz = -12 * 60;
+        if(tz > 14 * 60) tz = 14 * 60;
     }
     while(!(input & (KEY_A | KEY_B)) && !menuShouldExit);
 
     if (input & KEY_B)
         return;
 
-    utcOffset -= 12;
-    lastNtpTzOffset = 60 * utcOffset + utcOffsetMinute;
+    lastNtpTzOffset = tz;
 
     res = srvIsServiceRegistered(&isSocURegistered, "soc:U");
     cantStart = R_FAILED(res) || !isSocURegistered;
@@ -379,7 +386,7 @@ void MiscellaneousMenu_UpdateTimeDateNtp(void)
         res = ntpGetTimeStamp(&msSince1900, &samplingTick);
         if(R_SUCCEEDED(res))
         {
-            msSince1900 += 1000 * (3600 * utcOffset + 60 * utcOffsetMinute);
+            msSince1900 += (s64)60 * 1000 * tz;
             res = ntpSetTimeDate(msSince1900, samplingTick);
         }
     }
@@ -389,9 +396,8 @@ void MiscellaneousMenu_UpdateTimeDateNtp(void)
         Draw_Lock();
         Draw_DrawString(10, 10, COLOR_TITLE, "Miscellaneous options menu");
 
-        absOffset = utcOffset;
-        absOffset = absOffset < 0 ? -absOffset : absOffset;
-        Draw_DrawFormattedString(10, 30, COLOR_WHITE, "Current UTC offset:  %c%02d", utcOffset < 0 ? '-' : '+', absOffset);
+        absTz = tz < 0 ? -tz : tz;
+        Draw_DrawFormattedString(10, 30, COLOR_WHITE, "Current UTC offset:  %c%02d%02d", tz < 0 ? '-' : '+', absTz / 60, absTz % 60);
         if (cantStart)
             Draw_DrawFormattedString(10, posY + 2 * SPACING_Y, COLOR_WHITE, "Can't sync time/date before the system\nhas finished loading.") + SPACING_Y;
         else if (R_FAILED(res))
@@ -455,7 +461,7 @@ static Result MiscellaneousMenu_DumpDspFirmCallback(Handle procHandle, u32 textS
         return -3;
 
     // Dump to SD card (no point in dumping to CTRNAND as 3dsx stuff doesn't work there)
-    IFile file;
+    IFile file = { 0 }; // closed below even if the SD archive or folder could not be opened
     FS_Archive archive;
 
     // Create sdmc:/3ds directory if it doesn't exist yet

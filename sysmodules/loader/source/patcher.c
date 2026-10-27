@@ -553,6 +553,9 @@ static inline bool applyCodeUpsPatch(u8 *code, u32 *codeSize, u32 maxSize, u64 p
         }
     }
 
+    // Zero the cut-off tail when the patch shrinks the code, like IPS truncation and BPS do
+    if(patchedSize < baseSize) memset(code + patchedSize, 0, baseSize - patchedSize);
+
     *codeSize = patchedSize;
     ret = true;
 

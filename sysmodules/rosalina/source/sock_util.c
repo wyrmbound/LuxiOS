@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS.
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   SPDX-License-Identifier: (MIT OR GPL-2.0-or-later)
@@ -337,7 +338,14 @@ bool    Wifi__IsConnected(void)
     u32     status = 0;
     u32     wifistatus = 0;
 
-    acInit();
-    return R_SUCCEEDED(ACU_GetWifiStatus(&wifistatus)) && wifistatus > 0
+    // Keep libctru's ac refcount balanced: an extra reference here would keep the session open, so
+    // "Disable forced wireless connection" could never release a forced connection
+    if (R_FAILED(acInit()))
+        return false;
+
+    bool connected = R_SUCCEEDED(ACU_GetWifiStatus(&wifistatus)) && wifistatus > 0
         && R_SUCCEEDED(ACU_GetStatus(&status)) && status != 1;
+
+    acExit();
+    return connected;
 }

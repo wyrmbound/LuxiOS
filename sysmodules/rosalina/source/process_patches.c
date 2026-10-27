@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2021 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -47,7 +48,10 @@ Result OpenProcessByName(const char *name, Handle *h)
         char procName[8] = {0};
         svcGetProcessInfo((s64 *)procName, processHandle, 0x10000);
         if(strncmp(procName, name, 8) == 0)
+        {
             dstProcessHandle = processHandle;
+            break; // first match (continuing would leak this handle if the name matches twice)
+        }
         else
             svcCloseHandle(processHandle);
     }
@@ -86,5 +90,6 @@ Result OperateOnProcessByName(const char *name, OperateOnProcessCb func)
     res = func(processHandle, (u32)textSize, (u32)roSize, (u32)rwSize);
 
     svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
+    svcCloseHandle(processHandle);
     return res;
 }
