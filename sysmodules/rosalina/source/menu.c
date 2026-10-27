@@ -418,7 +418,9 @@ void menuEnter(void)
         // is fully drained and all completion interrupts delivered.
         for (int i = 0; i < 8; i++)
         {
-            while((GPU_PSC0_CNT | GPU_PSC1_CNT | GPU_TRANSFER_CNT | GPU_CMDLIST_CNT) & 1);
+            // Bounded (~100ms) so a wedged GPU can't hang the menu forever
+            for (u32 spin = 0; spin < 200 && ((GPU_PSC0_CNT | GPU_PSC1_CNT | GPU_TRANSFER_CNT | GPU_CMDLIST_CNT) & 1); spin++)
+                svcSleepThread(500 * 1000LL);
             svcSleepThread(2 * 1000 * 1000LL);
             if (!((GPU_PSC0_CNT | GPU_PSC1_CNT | GPU_TRANSFER_CNT | GPU_CMDLIST_CNT) & 1))
                 break;
