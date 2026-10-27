@@ -89,7 +89,7 @@ static size_t LumaConfig_SaveLumaIniConfigToStr(char *out, size_t outSize, const
 {
     char lumaVerStr[64];
     char lumaRevSuffixStr[16];
-    char rosalinaMenuComboStr[128];
+    char rosalinaMenuComboStr[256]; // Up to 32 key names joined by '+' (160 bytes)
 
     const char *splashPosStr;
     const char *n3dsCpuStr;

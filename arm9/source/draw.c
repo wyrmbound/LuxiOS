@@ -120,7 +120,7 @@ u32 drawFormattedString(bool isTopScreen, u32 posX, u32 posY, u32 color, const c
     char buf[DRAW_MAX_FORMATTED_STRING_SIZE + 1];
     va_list args;
     va_start(args, fmt);
-    vsprintf(buf, fmt, args);
+    vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
     return drawString(isTopScreen, posX, posY, color, buf);

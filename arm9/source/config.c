@@ -311,17 +311,16 @@ static void menuComboToString(char *out, u32 combo)
 
 static int encodedFloatToString(char *out, s64 val)
 {
-    s64 sign = val >= 0 ? 1 : -1;
+    // Print the sign separately: values in (-1, 0) have intPart == 0, so "-0.5" would lose it
+    const char *sign = val >= 0 ? "" : "-";
+    s64 absVal = val >= 0 ? val : -val;
 
-    s64 intPart = (sign * val) / FLOAT_CONV_MULT;
-    s64 fracPart = (sign * val) % FLOAT_CONV_MULT;
+    s64 intPart = absVal / FLOAT_CONV_MULT;
+    s64 fracPart = absVal % FLOAT_CONV_MULT;
 
-    while (fracPart % 10 != 0) {
-        // Remove trailing zeroes
-        fracPart /= 10;
-    }
-
-    int n = sprintf(out, "%lld", sign * intPart);
+    // Trailing zeroes are trimmed from the string below. (Dividing fracPart here would
+    // shift its digits, since it is printed zero-padded to FLOAT_CONV_PRECISION digits.)
+    int n = sprintf(out, "%s%lld", sign, intPart);
     if (fracPart != 0) {
         n += sprintf(out + n, ".%0*lld", (int)FLOAT_CONV_PRECISION, fracPart);
 
@@ -595,7 +594,7 @@ static size_t saveLumaIniConfigToStr(char *out, size_t outSize)
 
     char lumaVerStr[64];
     char lumaRevSuffixStr[16];
-    char rosalinaMenuComboStr[128];
+    char rosalinaMenuComboStr[256]; // Up to 32 key names joined by '+' (160 bytes)
 
     const char *splashPosStr;
     const char *n3dsCpuStr;

@@ -153,7 +153,7 @@ void MiscellaneousMenu_SwitchBoot3dsxTargetTitle(void)
 
 void MiscellaneousMenu_ChangeMenuCombo(void)
 {
-    char comboStrOrig[128], comboStr[128];
+    char comboStrOrig[256], comboStr[256]; // Up to 32 key names joined by '+' (160 bytes)
     u32 posY;
 
     Draw_Lock();
