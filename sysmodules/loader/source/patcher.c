@@ -35,7 +35,7 @@ static Result fileOpen(IFile *file, FS_ArchiveID archiveId, const char *path, u3
     return IFile_Open(file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, path), flags);
 }
 
-static bool dirCheck(FS_ArchiveID archiveId, const char *path)
+static bool dirCheck(FS_ArchiveID archiveId, const char *path, bool requireEntries)
 {
     bool ret;
     Handle handle;
@@ -45,7 +45,16 @@ static bool dirCheck(FS_ArchiveID archiveId, const char *path)
     else
     {
         ret = R_SUCCEEDED(FSUSER_OpenDirectory(&handle, archive, fsMakePath(PATH_ASCII, path)));
-        if(ret) FSDIR_Close(handle);
+        if(ret)
+        {
+            if(requireEntries)
+            {
+                static FS_DirectoryEntry entry; // large, keep it off the stack
+                u32 entriesRead = 0;
+                ret = R_SUCCEEDED(FSDIR_Read(handle, &entriesRead, 1, &entry)) && entriesRead != 0;
+            }
+            FSDIR_Close(handle);
+        }
         FSUSER_CloseArchive(archive);
     }
 
@@ -63,7 +72,7 @@ static u32 checkLumaDir(const char *path)
 {
     FS_ArchiveID archiveId = isSdMode ? ARCHIVE_SDMC : ARCHIVE_NAND_RW;
 
-    return dirCheck(archiveId, path) ? archiveId : 0;
+    return dirCheck(archiveId, path, true) ? archiveId : 0; // only used for LayeredFS: an empty folder means no mod
 }
 
 static inline bool secureInfoExists(void)
@@ -634,12 +643,18 @@ bool loadTitleCodeSection(u8 *outCode, u32 *outSize, u32 maxSize, u64 progId)
     /* Here we look for "/luma/titles/[u64 titleID in hex, uppercase]/code.bin"
        If it exists it should be a decrypted and decompressed binary code file */
 
-    char path[] = "/luma/titles/0000000000000000/code.bin";
+    char path[] = "/luma/titles/0000000000000000/exefs/code.bin";
     progIdToStr(path + 28, progId);
 
     IFile file;
 
-    if(!openLumaFile(&file, path)) return false;
+    // Also accept exefs/code.bin, the layout extracted ExeFS folders use (upstream request #2154)
+    memmove(path + 30, path + 36, sizeof("code.bin"));
+    if(!openLumaFile(&file, path))
+    {
+        memcpy(path + 30, "exefs/code.bin", sizeof("exefs/code.bin"));
+        if(!openLumaFile(&file, path)) return false;
+    }
 
     u64 fileSize;
 
@@ -842,8 +857,10 @@ static inline bool patchLayeredFs(u64 progId, u8 *code, u32 size, u32 textSize, 
         pathOffset = 0,
         pathAddress = 0xDEADCAFE;
 
+    // Unknown SDK layout or no room for the payload: run the game without LayeredFS rather than
+    // making it unlaunchable (svcBreak) just because a romfs folder exists
     if(!findLayeredFsSymbols(code, textSize, &fsMountArchive, &fsRegisterArchive, &fsTryOpenFile, &fsOpenFileDirectly, &fsUnmountArchive) ||
-       !findLayeredFsPayloadOffset(code, textSize, roSize, dataSize, roAddress, dataAddress, &payloadOffset, &pathOffset, &pathAddress)) return false;
+       !findLayeredFsPayloadOffset(code, textSize, roSize, dataSize, roAddress, dataAddress, &payloadOffset, &pathOffset, &pathAddress)) return true;
 
     static const char *updateRomFsMounts[] = { "ro2:",
                                                "rom2:",
@@ -869,15 +886,37 @@ static inline bool patchLayeredFs(u64 progId, u8 *code, u32 size, u32 textSize, 
     else
     {
         u32 updateRomFsIndex;
+        const u32 nbCandidates = sizeof(updateRomFsMounts) / sizeof(char *) - 1;
 
         //Locate update RomFS
-        for(updateRomFsIndex = 0; updateRomFsIndex < sizeof(updateRomFsMounts) / sizeof(char *) - 1; updateRomFsIndex++)
+        for(updateRomFsIndex = 0; updateRomFsIndex < nbCandidates; updateRomFsIndex++)
         {
             u32 patternSize = strlen(updateRomFsMounts[updateRomFsIndex]);
             u8 temp[7];
             temp[0] = 0;
             memcpy(temp + 1, updateRomFsMounts[updateRomFsIndex], patternSize);
             if(memsearch(code, temp, size, patternSize + 1) != NULL) break;
+        }
+
+        // Second pass, only if nothing matched (so titles that worked keep the same choice): the mount name
+        // isn't always preceded by a NUL (e.g. a literal after a non-zero word), which made mods silently not
+        // apply to update RomFS files (upstream #2104). Accept "name\0" at a 4-byte aligned offset
+        for(u32 i = 0; updateRomFsIndex == nbCandidates && i < nbCandidates; i++)
+        {
+            u32 patternSize = strlen(updateRomFsMounts[i]);
+            u8 temp[7];
+            memcpy(temp, updateRomFsMounts[i], patternSize);
+            temp[patternSize] = 0;
+
+            for(u8 *pos = code, *found; (u32)(code + size - pos) > patternSize &&
+                (found = memsearch(pos, temp, code + size - pos, patternSize + 1)) != NULL; pos = found + 1)
+            {
+                if(((u32)(found - code) & 3) == 0)
+                {
+                    updateRomFsIndex = i;
+                    break;
+                }
+            }
         }
         updateRomFsMount = updateRomFsMounts[updateRomFsIndex];
     }

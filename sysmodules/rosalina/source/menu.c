@@ -487,7 +487,7 @@ static void menuUpdateModsStatus(void)
 {
     static const struct { const char *file; const char *label; } modFiles[] = {
         { "romfs", "romfs" }, // directory: LayeredFS
-        { "code.bin", "code" }, { "code.ips", "code" }, { "code.bps", "code" }, { "code.ups", "code" },
+        { "code.bin", "code" }, { "exefs/code.bin", "code" }, { "code.ips", "code" }, { "code.bps", "code" }, { "code.ups", "code" },
         { "exheader.bin", "exheader" }, { "locale.txt", "locale" }, { "remaster.bin", "update" },
     };
 
