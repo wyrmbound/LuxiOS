@@ -40,6 +40,7 @@
 #include "plugin.h"
 #include "menus/screen_filters.h"
 #include "shell.h"
+#include "pmdbgext.h"
 
 //#define ROSALINA_MENU_SELF_SCREENSHOT 1 // uncomment this to enable the feature
 
@@ -61,6 +62,8 @@ bool hidShouldUseIrrst(void)
     // ir:rst exposes only two sessions :(
     return false;
 }
+
+static void menuUpdateModsStatus(void);
 
 static inline u32 convertHidKeys(u32 keys)
 {
@@ -385,6 +388,7 @@ void menuThreadMain(void)
             menuEnter();
             if(isN3DS) N3DSMenu_UpdateStatus();
             PluginLoader__UpdateMenu();
+            menuUpdateModsStatus();
             menuShow(&rosalinaMenu);
             menuLeave();
         }
@@ -475,6 +479,64 @@ void menuRequestClose(void)
     menuCloseRequested = true;
 }
 
+// Which mods the running game has in /luma/titles/<TitleID>/ (upstream request #2093: easy to forget one is on).
+// Filled once when the main menu opens; empty if none or no game is running
+static char menuModsStr[48];
+
+static void menuUpdateModsStatus(void)
+{
+    static const struct { const char *file; const char *label; } modFiles[] = {
+        { "romfs", "romfs" }, // directory: LayeredFS
+        { "code.bin", "code" }, { "code.ips", "code" }, { "code.bps", "code" }, { "code.ups", "code" },
+        { "exheader.bin", "exheader" }, { "locale.txt", "locale" }, { "remaster.bin", "update" },
+    };
+
+    menuModsStr[0] = 0;
+
+    FS_ProgramInfo progInfo;
+    u32 pid, launchFlags;
+    if (R_FAILED(PMDBG_GetCurrentAppInfo(&progInfo, &pid, &launchFlags)))
+        return;
+
+    s64 out;
+    svcGetSystemInfo(&out, 0x10000, 0x203);
+    FS_ArchiveID archiveId = (bool)out ? ARCHIVE_SDMC : ARCHIVE_NAND_RW;
+    svcGetSystemInfo(&out, 0x10000, 3);
+    bool patchingEnabled = (((u32)out >> PATCHGAMES) & 1) != 0;
+
+    FS_Archive archive;
+    if (R_FAILED(FSUSER_OpenArchive(&archive, archiveId, fsMakePath(PATH_EMPTY, ""))))
+        return;
+
+    char found[48] = { 0 };
+    u32 n = 0;
+    for (u32 i = 0; i < sizeof(modFiles) / sizeof(modFiles[0]); i++)
+    {
+        char path[64];
+        sprintf(path, "/luma/titles/%016llX/%s", progInfo.programId, modFiles[i].file);
+
+        Handle h;
+        bool exists;
+        if (i == 0)
+        {
+            exists = R_SUCCEEDED(FSUSER_OpenDirectory(&h, archive, fsMakePath(PATH_ASCII, path)));
+            if (exists) FSDIR_Close(h);
+        }
+        else
+        {
+            exists = R_SUCCEEDED(FSUSER_OpenFile(&h, archive, fsMakePath(PATH_ASCII, path), FS_OPEN_READ, 0));
+            if (exists) FSFILE_Close(h);
+        }
+
+        if (exists && strstr(found, modFiles[i].label) == NULL) // "code" can match several files
+            n += snprintf(found + n, sizeof(found) - n, "%s%s", n ? ", " : "", modFiles[i].label);
+    }
+    FSUSER_CloseArchive(archive);
+
+    if (found[0] != 0)
+        snprintf(menuModsStr, sizeof(menuModsStr), patchingEnabled ? "Mods: %s" : "Mods present, but game patching is off", found);
+}
+
 static void menuDraw(Menu *menu, u32 selected)
 {
     char versionString[16];
@@ -561,6 +623,10 @@ static void menuDraw(Menu *menu, u32 selected)
         Draw_DrawFormattedString(10, SCREEN_BOT_HEIGHT - 20, COLOR_TITLE, "LuxiOS %s", versionString);
     else
         Draw_DrawFormattedString(10, SCREEN_BOT_HEIGHT - 20, COLOR_TITLE, "LuxiOS %s-%08lx", versionString, commitHash);
+
+    // Main menu only: submenus can have enough items to reach this line
+    if(menu == &rosalinaMenu && menuModsStr[0] != 0)
+        Draw_DrawString(10, SCREEN_BOT_HEIGHT - 20 - SPACING_Y - 2, COLOR_WHITE, menuModsStr);
 
     Draw_FlushFramebuffer();
 }
