@@ -646,6 +646,16 @@ void menuShow(Menu *root)
             else
                 break;
         }
+        else if(pressed & KEY_Y)
+        {
+            // Hold Y to peek at the game's bottom screen; the game stays paused (upstream request #2224)
+            Draw_Lock();
+            Draw_RestoreFramebuffer();
+            while(!menuShouldExit && (scanHeldKeys() & KEY_Y))
+                svcSleepThread(16 * 1000 * 1000LL);
+            Draw_SetupFramebuffer();
+            Draw_Unlock();
+        }
         else if(pressed & (KEY_DOWN | KEY_UP))
         {
             s32 n = (pressed & KEY_DOWN) != 0 ? 1 : -1;
