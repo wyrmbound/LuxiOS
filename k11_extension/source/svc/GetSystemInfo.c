@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -238,7 +239,7 @@ Result GetSystemInfoHook(s64 *out, s32 type, s32 param)
         }
 
         default:
-            GetSystemInfo(out, type, param);
+            res = GetSystemInfo(out, type, param); // pass on the real kernel's result
             break;
     }
 

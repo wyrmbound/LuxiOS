@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -61,7 +62,7 @@ Result  ControlMemoryUnsafe(u32 *out, u32 addr0, u32 size, MemOp op, MemPerm per
                     break;
                 }
 
-                memset(kvAddr, 0, size >> 2);
+                memset(kvAddr, 0, size); // memset takes bytes: "size >> 2" left 3/4 of the block with stale FCRAM
                 flushDataCacheRange(kvAddr, size);
                 pAddr = (u32)kvAddr + 0x40000000;
                 state = 0x3907;

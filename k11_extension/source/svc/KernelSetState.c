@@ -56,9 +56,6 @@ Result SetSyscallDebugEventMask(u32 pid, bool enable, const u32 *mask)
     static KRecursiveLock syscallDebugEventMaskLock = { NULL };
 
     u32 tmpMask[8];
-    if(enable && nbEnabled == MAX_DEBUG)
-        return 0xC86018FF; // Out of resource (255)
-
     if(enable && !usrToKernelMemcpy8(&tmpMask, mask, 32))
         return 0xE0E01BF5;
 
@@ -67,8 +64,21 @@ Result SetSyscallDebugEventMask(u32 pid, bool enable, const u32 *mask)
 
     if(enable)
     {
-        maskedPids[nbEnabled] = pid;
-        memcpy(&masks[nbEnabled++], tmpMask, 32);
+        // Update the existing entry for this pid (GDB resends the list when it changes) instead of
+        // adding a duplicate that would shadow the new mask and survive a single disable
+        u32 id;
+        for(id = 0; id < nbEnabled && maskedPids[id] != pid; id++);
+        if(id == nbEnabled)
+        {
+            if(nbEnabled == MAX_DEBUG)
+            {
+                KRecursiveLock__Unlock(&syscallDebugEventMaskLock);
+                KRecursiveLock__Unlock(criticalSectionLock);
+                return 0xC86018FF; // Out of resource (255)
+            }
+            maskedPids[nbEnabled++] = pid;
+        }
+        memcpy(&masks[id], tmpMask, 32);
         svcSignalingEnabled |= 1;
     }
     else
@@ -89,7 +99,8 @@ Result SetSyscallDebugEventMask(u32 pid, bool enable, const u32 *mask)
         }
         maskedPids[--nbEnabled] = 0;
         memset(&masks[nbEnabled], 0, 32);
-        svcSignalingEnabled &= ~1;
+        if(nbEnabled == 0) // other processes may still be catching syscalls
+            svcSignalingEnabled &= ~1;
     }
 
     KRecursiveLock__Unlock(&syscallDebugEventMaskLock);
