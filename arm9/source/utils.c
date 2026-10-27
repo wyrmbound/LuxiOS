@@ -59,7 +59,8 @@ void startChrono(void)
 u64 chrono(void)
 {
     u64 res = 0;
-    for(u32 i = 0; i < 4; i++) res |= REG_TIMER_VAL(i) << (16 * i);
+    // Cast before shifting: the u16 register promotes to int, so << 16 hit the sign bit and << 32/48 were undefined
+    for(u32 i = 0; i < 4; i++) res |= (u64)REG_TIMER_VAL(i) << (16 * i);
 
     res /= (TICKS_PER_SEC / 1000);
 

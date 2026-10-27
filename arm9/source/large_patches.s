@@ -70,7 +70,7 @@ rebootPatch:
     @ Copy argv[0]
     ldr r0, =fname_addr
     adr r1, rebootPatchFileName
-    mov r2, #82
+    mov r2, #(2*(80+1)) @ bytes: the whole 80-char path + NUL (was 82 bytes = 41 chars, truncating long paths)
     bl memcpy16
 
     ldr r0, =argv_addr
