@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -367,7 +368,7 @@ static Result InputRedirection_DoUndoHidPatches(Handle processHandle, bool doPat
             return -1;
         }
 
-        u32 *off2 = (u32 *)memsearch((u8 *)off + sizeof(hidOrigRegisterAndValue), &hidOrigRegisterAndValue, totalSize - ((u32)off - 0x00100000), sizeof(hidOrigRegisterAndValue));
+        u32 *off2 = (u32 *)memsearch((u8 *)off + sizeof(hidOrigRegisterAndValue), &hidOrigRegisterAndValue, totalSize - ((u32)off - 0x00100000) - sizeof(hidOrigRegisterAndValue), sizeof(hidOrigRegisterAndValue));
         if(off2 == NULL)
         {
             svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);

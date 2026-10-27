@@ -397,13 +397,14 @@ void menuThreadMain(void)
 }
 
 static s32 menuRefCount = 0;
+static bool menuFramebufferActive = false; // true while the game is frozen and our framebuffer is set up
 void menuEnter(void)
 {
     Draw_Lock();
-    if(!menuShouldExit && menuRefCount == 0)
+    // Count every call (nested ones too) so that each menuLeave is balanced; only the outermost one freezes the game
+    if(menuRefCount++ == 0 && !menuShouldExit)
     {
         menuCloseRequested = false;
-        menuRefCount++;
 
         // Phase 1: Freeze game/app threads to stop new GPU command submissions
         svcKernelSetState(0x10000, 1);
@@ -435,14 +436,16 @@ void menuEnter(void)
         if (R_FAILED(Draw_AllocateFramebufferCache(FB_BOTTOM_SIZE)))
         {
             // Oops
-            menuRefCount = 0;
             svcKernelSetState(0x10000, 2);
             svcSleepThread(5 * 1000 * 100LL);
             svcKernelSetState(0x10000, 1);
             svcSleepThread(5 * 1000 * 100LL);
         }
         else
+        {
             Draw_SetupFramebuffer();
+            menuFramebufferActive = true;
+        }
     }
     Draw_Unlock();
 }
@@ -452,8 +455,9 @@ void menuLeave(void)
     svcSleepThread(50 * 1000 * 1000);
 
     Draw_Lock();
-    if(--menuRefCount == 0)
+    if(menuRefCount > 0 && --menuRefCount == 0 && menuFramebufferActive)
     {
+        menuFramebufferActive = false;
         Draw_RestoreFramebuffer();
         Draw_FreeFramebufferCache();
 

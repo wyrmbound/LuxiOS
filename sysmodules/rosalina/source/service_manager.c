@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -25,6 +26,7 @@
 */
 
 #include <3ds.h>
+#include <string.h>
 #include "service_manager.h"
 
 #define TRY(expr) if(R_FAILED(res = (expr))) goto cleanup;
@@ -44,6 +46,7 @@ Result ServiceManager_Run(const ServiceManagerServiceEntry *services, const Serv
     }
 
     Handle waitHandles[1 + numServices + maxSessionsTotal];
+    memset(waitHandles, 0, sizeof(waitHandles)); // cleanup closes these even if setup failed early
     void *ctxs[maxSessionsTotal];
     u8 handlerIds[maxSessionsTotal];
 
@@ -162,7 +165,8 @@ cleanup:
     for (u32 i = 0; notifications[i].handler != NULL; i++) {
         // Termination & ready for reboot events send by PM using PublishToProcess don't require subscription.
         if (notifications[i].id != 0x100 && notifications[i].id != 0x179) {
-            TRY(srvUnsubscribe(notifications[i].id));
+            // Not TRY: it jumps back to cleanup, looping forever if this fails (e.g. never subscribed)
+            srvUnsubscribe(notifications[i].id);
         }
     }
 

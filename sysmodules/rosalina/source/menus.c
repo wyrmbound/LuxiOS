@@ -123,8 +123,9 @@ void RosalinaMenu_PowerOffOrReboot(void)
         }
         else if(pressed & KEY_A)
         {
-            // Soft shutdown
-            menuLeave();
+            // Soft shutdown. Close the menu instead of calling menuLeave() here: the menu loop would
+            // otherwise keep drawing into the restored game framebuffer and unbalance the refcount
+            menuRequestClose();
             srvPublishToSubscriber(0x203, 0);
             return;
         }

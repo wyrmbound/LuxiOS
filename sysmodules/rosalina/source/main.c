@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2021 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -139,19 +140,29 @@ static void handleTermNotification(u32 notificationId)
 
 static void handleSleepNotification(u32 notificationId)
 {
-    ptmSysmInit();
+    // srv is non-blocking for us, so ptm:sysm can fail to open if its port is momentarily full. Retry, since
+    // PTM waits for our reply/ack. And never call ptmSysmExit after a failed init: that would make libctru's
+    // refcount negative, after which ptmSysmInit "succeeds" without a handle and every later ack is lost
+    // (system stuck in standby; possibly upstream #2258)
+    Result ptmRes;
+    for (u32 i = 0; R_FAILED(ptmRes = ptmSysmInit()) && i < 100; i++)
+        svcSleepThread(10 * 1000 * 1000LL);
+    bool ptmOk = R_SUCCEEDED(ptmRes);
+
     s32 ackValue = ptmSysmGetNotificationAckValue(notificationId);
     switch (notificationId)
     {
         case PTMNOTIFID_SLEEP_REQUESTED:
             menuShouldExit = true;
-            PTMSYSM_ReplyToSleepQuery(miniSocEnabled); // deny sleep request if we have network stuff running
+            if (ptmOk)
+                PTMSYSM_ReplyToSleepQuery(miniSocEnabled); // deny sleep request if we have network stuff running
             break;
         case PTMNOTIFID_GOING_TO_SLEEP:
         case PTMNOTIFID_SLEEP_ALLOWED:
         case PTMNOTIFID_FULLY_WAKING_UP:
         case PTMNOTIFID_HALF_AWAKE:
-            PTMSYSM_NotifySleepPreparationComplete(ackValue);
+            if (ptmOk)
+                PTMSYSM_NotifySleepPreparationComplete(ackValue);
             break;
         case PTMNOTIFID_SLEEP_DENIED:
         case PTMNOTIFID_FULLY_AWAKE:
@@ -160,7 +171,8 @@ static void handleSleepNotification(u32 notificationId)
         default:
             break;
     }
-    ptmSysmExit();
+    if (ptmOk)
+        ptmSysmExit();
 }
 
 static void handleShellNotification(u32 notificationId)

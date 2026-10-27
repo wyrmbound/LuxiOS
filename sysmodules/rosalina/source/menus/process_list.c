@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2022 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -88,13 +89,16 @@ static inline int ProcessListMenu_FormatInfoLine(char *out, const ProcessInfo *i
         else if ((ctx->flags & GDB_FLAG_SELECTED) && (ctx->localPort >= GDB_PORT_BASE && ctx->localPort < GDB_PORT_BASE + MAX_DEBUG))
         {
             checkbox = "(W) ";
-            sprintf(commentBuf, "Port: %hu             ", ctx->localPort);
+            snprintf(commentBuf, sizeof(commentBuf), "Port: %-17hu", ctx->localPort);
         }
     }
 
     else if (!isRelease)
     {
-        sprintf(commentBuf, "%lums               \n", info->creationTimeMs);
+        // "%lums" plus the old padding overflowed commentBuf once uptime reached ~100 s
+        char msBuf[16];
+        sprintf(msBuf, "%lums", info->creationTimeMs);
+        snprintf(commentBuf, sizeof(commentBuf), "%-23s", msBuf);
     }
 
     if (gdbServer.super.running)
