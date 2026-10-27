@@ -43,6 +43,7 @@ Result SendSyncRequestHook(Handle handle)
 
     u32 *cmdbuf = (u32 *)((u8 *)currentCoreContext->objectContext.currentThread->threadLocalStorage + 0x80);
     bool skip = false;
+    bool isRegionQuery = false;
     Result res = 0;
 
      // not the exact same test but it should work
@@ -74,6 +75,15 @@ Result SendSyncRequestHook(Handle handle)
                 break;
             }
 
+            case 0x8030204: // fs:USER OpenFileDirectly
+            {
+                SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession);
+                if(info != NULL && strcmp(info->name, "fs:USER") == 0)
+                    doLangEmuVersionTitleRedirect(cmdbuf);
+
+                break;
+            }
+
             case 0x10800:
             {
                 SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession);
@@ -87,7 +97,10 @@ Result SendSyncRequestHook(Handle handle)
             {
                 SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession);
                 if(info != NULL && (strcmp(info->name, "cfg:u") == 0 || strcmp(info->name, "cfg:s") == 0 || strcmp(info->name, "cfg:i") == 0)) // SecureInfoGetRegion
+                {
                     skip = doLangEmu(&res, cmdbuf);
+                    isRegionQuery = true;
+                }
 
                 break;
             }
@@ -274,7 +287,10 @@ Result SendSyncRequestHook(Handle handle)
             {
                 SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession); // SecureInfoGetRegion
                 if(info != NULL && (strcmp(info->name, "cfg:s") == 0 || strcmp(info->name, "cfg:i") == 0))
+                {
                     skip = doLangEmu(&res, cmdbuf);
+                    isRegionQuery = true;
+                }
 
                 break;
             }
@@ -283,7 +299,10 @@ Result SendSyncRequestHook(Handle handle)
             {
                 SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession); // SecureInfoGetRegion
                 if(info != NULL && strcmp(info->name, "cfg:i") == 0)
+                {
                     skip = doLangEmu(&res, cmdbuf);
+                    isRegionQuery = true;
+                }
 
                 break;
             }
@@ -294,6 +313,10 @@ Result SendSyncRequestHook(Handle handle)
         clientSession->syncObject.autoObject.vtable->DecrementReferenceCount(&clientSession->syncObject.autoObject);
 
     res = skip ? res : SendSyncRequest(handle);
+
+    // A real (not emulated) region reply: remember it for doLangEmuVersionTitleRedirect
+    if(isRegionQuery && !skip && res >= 0 && cmdbuf[1] == 0)
+        LangEmu_RecordRealRegion((u8)cmdbuf[2]);
 
     return res;
 }

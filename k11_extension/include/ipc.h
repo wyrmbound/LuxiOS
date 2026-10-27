@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -57,4 +58,6 @@ void SessionInfo_Add(KSession *session, const char *name);
 void SessionInfo_Remove(KSession *session);
 
 bool doLangEmu(Result *res, u32 *cmdbuf);
+void LangEmu_RecordRealRegion(u8 region);
+void doLangEmuVersionTitleRedirect(u32 *cmdbuf);
 bool doErrfThrowHook(u32 *cmdbuf);

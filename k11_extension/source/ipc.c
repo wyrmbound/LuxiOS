@@ -270,3 +270,58 @@ bool doErrfThrowHook(u32 *cmdbuf)
 
     return false;
 }
+
+// The console's real region, learned from SecureInfoGetRegion replies to processes that don't
+// emulate a region (HOME Menu asks at boot). 0xFF until known
+static u8 realRegion = 0xFF;
+
+void LangEmu_RecordRealRegion(u8 region)
+{
+    if(region < 7)
+        realRegion = region;
+}
+
+// For apps using region emulation: libctru's osGetSystemVersionData opens the NVer/CVer system title
+// (version.bin) of the *emulated* region, which doesn't exist on the console, so the version check fails
+// (upstream #2141). Point such fs:USER OpenFileDirectly requests to the real region's title instead.
+void doLangEmuVersionTitleRedirect(u32 *cmdbuf)
+{
+    static const u32 nverTidLow[7] = { 0x00016202, 0x00016302, 0x00016102, 0x00016202, 0x00016402, 0x00016502, 0x00016602 };
+    static const u32 cverTidLow[7] = { 0x00017202, 0x00017302, 0x00017102, 0x00017202, 0x00017402, 0x00017502, 0x00017602 };
+
+    // OpenFileDirectly on ARCHIVE_SAVEDATA_AND_CONTENT, with a 16-byte binary archive path {tidLow, tidHigh, mediatype, 0}
+    if(cmdbuf[2] != 0x2345678A || cmdbuf[3] != 1 || cmdbuf[4] != 16 || cmdbuf[9] != ((16 << 14) | (2 << 10) | 2) || realRegion >= 7)
+        return;
+
+    u32 path[4];
+    if(!usrToKernelMemcpy8(path, (const void *)cmdbuf[10], sizeof(path)) || path[1] != 0x000400DB)
+        return;
+
+    KRecursiveLock__Lock(criticalSectionLock);
+    KRecursiveLock__Lock(&processLangemuLock);
+
+    u64 titleId = codeSetOfProcess(currentCoreContext->objectContext.currentProcess)->titleId;
+    u8 emulatedRegion = 0xFF;
+    for(u32 i = 0; i < 0x40; i++)
+    {
+        if(processLangemuAttributes[i].titleId == titleId && (processLangemuAttributes[i].mask & 1))
+            emulatedRegion = processLangemuAttributes[i].region;
+    }
+
+    KRecursiveLock__Unlock(&processLangemuLock);
+    KRecursiveLock__Unlock(criticalSectionLock);
+
+    if(emulatedRegion >= 7 || emulatedRegion == realRegion)
+        return;
+
+    u32 newTidLow;
+    if(path[0] == nverTidLow[emulatedRegion])
+        newTidLow = nverTidLow[realRegion];
+    else if(path[0] == cverTidLow[emulatedRegion])
+        newTidLow = cverTidLow[realRegion];
+    else
+        return;
+
+    path[0] = newTidLow;
+    kernelToUsrMemcpy8((void *)cmdbuf[10], path, sizeof(path));
+}
