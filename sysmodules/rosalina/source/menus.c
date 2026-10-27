@@ -367,6 +367,11 @@ void RosalinaMenu_TakeScreenshot(void)
     timeSpentConvertingScreenshot = 0;
     timeSpentWritingScreenshot = 0;
 
+    // Hold L for the top screen only, R for the bottom screen only (upstream request #1801)
+    u32 heldKeys = scanHeldKeys();
+    bool wantTop = !(heldKeys & KEY_R) || (heldKeys & KEY_L);
+    bool wantBottom = !(heldKeys & KEY_L) || (heldKeys & KEY_R);
+
     if(R_FAILED(svcGetSystemInfo(&out, 0x10000, 0x203))) svcBreak(USERBREAK_ASSERT);
     isSdMode = (bool)out;
 
@@ -406,17 +411,23 @@ void RosalinaMenu_TakeScreenshot(void)
 
     dateTimeToString(dateTimeStr, osGetTime(), true);
 
-    snprintf(filename, sizeof(filename), "%s/%s_top.bmp", dirPath, dateTimeStr);
-    TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));
-    TRY(RosalinaMenu_WriteScreenshot(&file, topWidth, true, true));
-    TRY(IFile_Close(&file));
+    if(wantTop)
+    {
+        snprintf(filename, sizeof(filename), "%s/%s_top.bmp", dirPath, dateTimeStr);
+        TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));
+        TRY(RosalinaMenu_WriteScreenshot(&file, topWidth, true, true));
+        TRY(IFile_Close(&file));
+    }
 
-    snprintf(filename, sizeof(filename), "%s/%s_bot.bmp", dirPath, dateTimeStr);
-    TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));
-    TRY(RosalinaMenu_WriteScreenshot(&file, bottomWidth, false, true));
-    TRY(IFile_Close(&file));
+    if(wantBottom)
+    {
+        snprintf(filename, sizeof(filename), "%s/%s_bot.bmp", dirPath, dateTimeStr);
+        TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));
+        TRY(RosalinaMenu_WriteScreenshot(&file, bottomWidth, false, true));
+        TRY(IFile_Close(&file));
+    }
 
-    if(is3d && (Draw_GetCurrentFramebufferAddress(true, true) != Draw_GetCurrentFramebufferAddress(true, false)))
+    if(wantTop && is3d && (Draw_GetCurrentFramebufferAddress(true, true) != Draw_GetCurrentFramebufferAddress(true, false)))
     {
         snprintf(filename, sizeof(filename), "%s/%s_top_right.bmp", dirPath, dateTimeStr);
         TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));

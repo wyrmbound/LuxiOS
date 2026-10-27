@@ -141,7 +141,7 @@ u32 waitInput(void)
     return waitInputWithTimeout(-1);
 }
 
-static u32 scanHeldKeys(void)
+u32 scanHeldKeys(void)
 {
     u32 keys;
 

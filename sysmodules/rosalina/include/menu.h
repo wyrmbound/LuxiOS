@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2021 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -84,6 +85,7 @@ extern Handle preTerminationEvent;
 u32 waitInputWithTimeout(s32 msec);
 u32 waitInputWithTimeoutEx(u32 *outHeldKeys, s32 msec);
 u32 waitInput(void);
+u32 scanHeldKeys(void);
 
 u32 waitComboWithTimeout(s32 msec);
 u32 waitCombo(void);
