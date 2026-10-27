@@ -195,7 +195,7 @@ bool     TryToLoadPlugin(Handle process, bool isHomebrew)
             "Couldn't read file.",
             "Invalid plugin file\nNot a valid 3GX plugin format!",
             "Outdated plugin file\nCheck for an updated plugin.",
-            "Outdated plugin loader\nCheck for Luma3DS updates."   
+            "Outdated plugin loader\nCheck for LuxiOS updates."   
         };
 
         ctx->error.message = errors[R_MODULE(res) == RM_LDR ? R_DESCRIPTION(res) : 0];

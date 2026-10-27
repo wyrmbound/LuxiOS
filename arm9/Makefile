@@ -45,7 +45,7 @@ export HBLDR_DEFAULT_3DSX_TID ?= 000400000D921E00
 # DATA is a list of directories containing data files
 # INCLUDES is a list of directories containing header files
 #---------------------------------------------------------------------------------
-APP_TITLE	:=	Luma3DS
+APP_TITLE	:=	LuxiOS
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
 SOURCES		:=	source source/fatfs source/fatfs/sdmmc
@@ -99,7 +99,7 @@ export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
-export APP_TITLE	:=	$(notdir $(TOPDIR)/..)
+export APP_TITLE	:=	LuxiOS
 
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
