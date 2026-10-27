@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" width="320" height="240">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2C3470"/><stop offset="1" stop-color="#1B2045"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="240" rx="0" fill="url(#bg)"/>
+
+  <path d="M172,70 L132,140 L162,140 L146,190 L196,112 L166,112 Z" transform="translate(-4,-28)" fill="#2EC4B6" stroke="#1E1B2E" stroke-width="5" stroke-linejoin="round"/>
+  <text x="160" y="206" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="600" font-size="18" fill="#FFF4D6">charging up...</text>
+</svg>
