@@ -64,6 +64,19 @@ int main(void)
     checkParse("1.2x", -1, 0);
     checkParse("11", -1, 0);                  // out of range
 
+    // Integer parser: empty values used to parse as 0, and long numbers wrapped around
+    static const struct { const char *in; int wantRc; s64 want; } ints[] = {
+        { "", -1, 0 }, { "-", -1, 0 }, { "+", -1, 0 }, { "0", 0, 0 }, { "42", 0, 42 }, { "-7", 0, -7 },
+        { "999999999999999999", 0, 999999999999999999LL }, { "18446744073709551617", -1, 0 },
+    };
+    for (size_t i = 0; i < sizeof(ints) / sizeof(ints[0]); i++) {
+        s64 v = 12345;
+        int rc = parseDecIntOptionImpl(&v, ints[i].in, strlen(ints[i].in), INT64_MIN, INT64_MAX);
+        int ok = rc == ints[i].wantRc && (rc != 0 || v == ints[i].want);
+        failures += !ok;
+        printf("%s int \"%s\" -> rc=%d %lld\n", ok ? "ok  " : "FAIL", ints[i].in, rc, (long long)v);
+    }
+
     // Round trip: what we save must parse back to the same value
     static const s64 rt[] = { 110000001ll, -50000000ll, -150000000ll, 0, 99999999ll, -100000000ll };
     for (size_t i = 0; i < sizeof(rt) / sizeof(rt[0]); i++) {

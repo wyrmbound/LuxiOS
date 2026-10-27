@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -318,8 +319,9 @@ u32 patchKernel11(u8 *pos, u32 size, u32 baseK11VA, u32 *arm11SvcTable, u32 *arm
         for (u32 i = 0; i < 2 && (u8 *)off < pos + size; i++)
         {
             // cmp r2, #0x300; beq...
-            for (; (off[0] != 0xE3520C03 || off[1] != 0x0A000003) && (u8 *)off < pos + size; off++);
-            if ((u8 *)off > pos + size)
+            // Stop with room for off[1]: the old check ("> pos + size") let off[1] be written past the section
+            for (; (u8 *)(off + 2) <= pos + size && (off[0] != 0xE3520C03 || off[1] != 0x0A000003); off++);
+            if ((u8 *)(off + 2) > pos + size)
                 return 1;
             off[1] = 0xEA000003;
         }
@@ -950,8 +952,8 @@ u32 patchProtoUnitinfo1200(u8 *pos, u32 size, u8 *arm9Section, u32 arm9SectionSi
     if (patchSingleInstruction(pos, size, pattern1, sizeof(pattern1), +1, 0xE3A00001, &tmp_pos)) /* mov r0, #1 */
         return 1;
     tmp_pos += 8;
-    /* there are two of these */
-    if (patchSingleInstruction(tmp_pos, size, pattern1, sizeof(pattern1), +1, 0xE3A00001, &tmp_pos)) /* mov r0, #1 */
+    /* there are two of these (search what's left of Process9, not past it) */
+    if (patchSingleInstruction(tmp_pos, size - (u32)(tmp_pos - pos), pattern1, sizeof(pattern1), +1, 0xE3A00001, &tmp_pos)) /* mov r0, #1 */
         return 1;
     
     u8 pattern2[] = { 0xB8, 0x00, 0x9F, 0xE5,   /* LDR R0, #0x10010000 */

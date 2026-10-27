@@ -121,6 +121,11 @@ static int parseDecIntOptionImpl(s64 *out, const char *val, size_t numDigits, s6
         }
     }
 
+    // No digits at all (empty value, or just a sign) or more than s64 can hold: invalid
+    if (i == numDigits || numDigits - i > 18) {
+        return -1;
+    }
+
     for (; i < numDigits; i++) {
         u64 n = (u64)(val[i] - '0');
         if (n > 9) {
@@ -227,6 +232,10 @@ static int parseHexIntOption(u64 *out, const char *val, u64 minval, u64 maxval)
     *out = 0;
     size_t numDigits = strlen(val);
     u64 res = 0;
+
+    if (numDigits == 0 || numDigits > 16) { // empty, or would wrap around
+        return -1;
+    }
 
     for (size_t i = 0; i < numDigits; i++) {
         char c = val[i];
@@ -676,7 +685,8 @@ static bool readLumaIniConfig(void)
 
     tmpIniBuffer[rd] = '\0';
 
-    return ini_parse_string(tmpIniBuffer, &configIniHandler, &configData) >= 0 && !hasIniParseError;
+    // > 0 is the line number of a malformed line (parsing stopped there): treat it like an invalid value
+    return ini_parse_string(tmpIniBuffer, &configIniHandler, &configData) == 0 && !hasIniParseError;
 }
 
 static bool writeLumaIniConfig(void)
@@ -746,7 +756,13 @@ static bool readConfigMcu(void)
     // Note: data written with the previous 6-byte layout (lumaVersion, bootCfg, reserved[2], checksum)
     // is always rejected here, as lumaVersion now overlaps with the old bootCfg and reserved[0] fields
     // (thus is < 0x100)
-    if (checksum != configDataMcu.checksum || configDataMcu.lumaVersion < MAKE_LUMA_VERSION_MCU(10, 3, 0))
+    // Builds versioned below 10.3 (no git tag, or a fork's own numbering) still accept their own data, instead of
+    // resetting the config and redoing the upgrade process on every boot
+    u16 minLumaVersion = MAKE_LUMA_VERSION_MCU(10, 3, 0);
+    u16 curLumaVersion = MAKE_LUMA_VERSION_MCU(VERSION_MAJOR, VERSION_MINOR, VERSION_BUILD);
+    if (curLumaVersion < minLumaVersion)
+        minLumaVersion = curLumaVersion;
+    if (checksum != configDataMcu.checksum || configDataMcu.lumaVersion < minLumaVersion)
     {
         // Invalid data stored in MCU...
         resetConfigMcu();

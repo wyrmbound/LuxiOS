@@ -797,7 +797,7 @@ struct b9_key {
     u16 b9_offs;
 };
 
-static const struct b9_key key_X[23] = {
+static const struct b9_key key_X[] = { // sized by its entries: padding entries loaded keyslot 0x00
     { .keyslot = 0x2C, .b9_offs = 0xDDD0 }, { .keyslot = 0x2D, .b9_offs = 0xDDD0 },
     { .keyslot = 0x2E, .b9_offs = 0xDDD0 }, { .keyslot = 0x2F, .b9_offs = 0xDDD0 },
     { .keyslot = 0x30, .b9_offs = 0xDDE0 }, { .keyslot = 0x31, .b9_offs = 0xDDE0 },
@@ -809,7 +809,7 @@ static const struct b9_key key_X[23] = {
     { .keyslot = 0x3C, .b9_offs = 0xDE10 }, { .keyslot = 0x3D, .b9_offs = 0xDE20 },
     { .keyslot = 0x3E, .b9_offs = 0xDE30 }, { .keyslot = 0x3F, .b9_offs = 0xDE40 },
 };
-static const struct b9_key key_Y[9] = {
+static const struct b9_key key_Y[] = {
     { .keyslot = 0x8, .b9_offs = 0xDE90 }, { .keyslot = 0x9, .b9_offs = 0xDEA0 },
     { .keyslot = 0xA, .b9_offs = 0xDEB0 }, { .keyslot = 0xB, .b9_offs = 0xDEC0 },
 };
@@ -846,8 +846,8 @@ u32 patchPrototypeNative(FirmwareSource nandType, bool doUnitinfoPatch)
     {
         if (firmProtoVersion == 1200)
         {
-            u8 b9[0x10000] = { 0 };
-            u32 hash[4] = { 0 };
+            static u8 b9[0x10000] __attribute__((aligned(4))); // was on the stack, which is only 0x10000 bytes itself
+            u32 hash[32 / 4] = { 0 }; // SHA-256 is 32 bytes (was 16: stack overflow)
             sha(hash, (const void *)0x08080000, 0x10000, SHA_256_MODE);
             
             if (memcmp(hash, boot9Sha256, 32) != 0)
