@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -207,6 +208,12 @@ Result KernelSetStateHook(u32 type, u32 varg1, u32 varg2, u32 varg3)
                 KProcessHandleTable *table = handleTableOfProcess(currentCoreContext->objectContext.currentProcess);
                 signalPluginEvent = (KEvent *)KProcessHandleTable__ToKAutoObject(table, varg1);
             }
+            break;
+        }
+        case 0x10008:
+        {
+            // Rosalina: LED master brightness override changed
+            cfwInfo.ledMasterBrightnessOverride = (u8)varg1;
             break;
         }
         case 0x10080:

@@ -15,7 +15,12 @@ cat > "$WORK/memory.h" <<'EOF'
 typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef uint64_t u64;
 typedef int8_t s8; typedef int16_t s16; typedef int32_t s32; typedef int64_t s64;
 EOF
-tr -d '\r' < "$SRC/sysmodules/rosalina/source/utils.c" | sed -n '/^int dateTimeToString/,/^}/p' > "$WORK/extracted.inc"
+{
+    tr -d '\r' < "$SRC/sysmodules/rosalina/include/utils.h" | grep '#define MS_IN_A_DAY'
+    tr -d '\r' < "$SRC/sysmodules/rosalina/include/utils.h" | sed -n '/^typedef struct CalendarTime/,/} CalendarTime;/p'
+    tr -d '\r' < "$SRC/sysmodules/rosalina/source/utils.c" | sed -n '/^void calendarTimeFromMsSince1900/,/^}/p'
+    tr -d '\r' < "$SRC/sysmodules/rosalina/source/utils.c" | sed -n '/^int dateTimeToString/,/^}/p'
+} > "$WORK/extracted.inc"
 cp "$SRC/arm9/source/fmt.c" "$SRC/arm9/source/fmt.h" "$WORK/"
 RENAME="-Dsnprintf=lsnprintf -Dvsnprintf=lvsnprintf -Dsprintf=lsprintf -Dvsprintf=lvsprintf -fno-builtin"
 clang -std=gnu11 -O1 -I"$WORK" $RENAME -c "$WORK/fmt.c" -o "$WORK/fmt.o"

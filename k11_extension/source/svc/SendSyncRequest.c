@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -195,6 +196,40 @@ Result SendSyncRequestHook(Handle handle)
                         || (plgStatus == PLG_CFG_INHOME && (command >= 10 || command <= 12)))  // COMMAND_WAKEUP_BY_EXIT || COMMAND_WAKEUP_BY_PAUSE
                             PLG_SignalEvent(PLG_CFG_HOME_EVENT);
                     }
+                }
+                break;
+            }
+
+            case 0x2E0040: // mcu::RTC SetPowerLedPattern
+            {
+                // LED master brightness override set to 0%: prevent ptm from setting
+                // sleep "breathing" pattern so that the led can stay off/in auto mode
+
+                // We deliberately leave the POWER LED setting as "auto" instead of "off"
+                // so that the red POWER LED appears regardless of setting.
+                // Note that the red POWER LED is not dimmable.
+                if (cfwInfo.ledMasterBrightnessOverride != 0 || (u8)cmdbuf[1] != 2) // sleep "breathing" pattern
+                    break;
+
+                SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession);
+                if (info != NULL && strcmp(info->name, "mcu::RTC") == 0)
+                    cmdbuf[1] = (cmdbuf[1] & ~0xFF) | 0; // "auto" LED pattern
+                break;
+            }
+
+            case 0x300040: // mcu::RTC SetLedMasterBrightness
+            {
+                // LED master brightness override set to 0% (enabled, value 0): prevent ptm from
+                // changing the LED brightness when setting up sleep mode
+                if (cfwInfo.ledMasterBrightnessOverride != 0)
+                    break;
+
+                SessionInfo *info = SessionInfo_Lookup(clientSession->parentSession);
+                if (info != NULL && strcmp(info->name, "mcu::RTC") == 0)
+                {
+                    cmdbuf[0] = 0x300040;
+                    cmdbuf[1] = 0;
+                    skip = true;
                 }
                 break;
             }
