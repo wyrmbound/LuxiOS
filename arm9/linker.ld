@@ -1,3 +1,4 @@
+/* Modified for LuxiOS (2026). See the LuxiOS git history for the changes. */
 OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
 OUTPUT_ARCH(arm)
 ENTRY(_start)

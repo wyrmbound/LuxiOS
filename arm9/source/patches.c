@@ -1001,6 +1001,19 @@ u32 patchProtoUnitinfo1200(u8 *pos, u32 size, u8 *arm9Section, u32 arm9SectionSi
     syncaddr += 4;
     *(u32 *)syncaddr = 0xE3A03001; /* MOV R3, #1 */
     
+    return 0;
+}
+
+//Process9 code is only 2-byte aligned and the ARM9 rotates unaligned word loads, so read bytes
+static inline u32 read32Unaligned(const u8 *p)
+{
+    return p[0] | (p[1] << 8) | (p[2] << 16) | ((u32)p[3] << 24);
+}
+
+static inline bool isInP9(u32 addr, u32 len, u32 memAddr, u32 size)
+{
+    return addr >= memAddr && addr - memAddr <= size && len <= size - (addr - memAddr);
+}
 
 static bool getVtableAddress(u8 *pos, u32 size, const u8 *pattern, u32 patternSize, s32 patternOff, u32 memAddr, u32 *vtableAddr)
 {
@@ -1008,16 +1021,35 @@ static bool getVtableAddress(u8 *pos, u32 size, const u8 *pattern, u32 patternSi
 
     if(tmp == NULL) return false;
 
-    u16 *instrPtr = (u16 *)(tmp + patternOff); //ldr rX, [PTR_TO_VTABLE]
-    if((*instrPtr & 0xf800) != 0x4800) return false; //Check the instruction opcode
+    u8 *instrPtr = tmp + patternOff; //ldr rX, [PTR_TO_VTABLE]
+    if(((u32)instrPtr & 1) != 0 || instrPtr < pos || instrPtr + 2 > pos + size) return false;
 
-    *vtableAddr = *(u32 *)(((u32)instrPtr + 4 + 4*(*instrPtr & 0xff)) & ~0x3);
+    u16 instr = instrPtr[0] | (instrPtr[1] << 8);
+    if((instr & 0xf800) != 0x4800) return false; //Check the instruction opcode
 
-    if(*vtableAddr < memAddr || *vtableAddr >= memAddr + size) return false;
+    u8 *literal = (u8 *)(((u32)instrPtr + 4 + 4*(instr & 0xff)) & ~0x3);
+    if(literal < pos || literal + 4 > pos + size) return false;
 
-    return true;
+    *vtableAddr = read32Unaligned(literal);
+
+    return isInP9(*vtableAddr, 12 * 4, memAddr, size); //We use entry 11
 }
 
+//Returns true if the Thumb function at addr loads the 0xE0C046F8 error code early on (the stub being replaced)
+static bool isReadFileSHA256Stub(u8 *pos, u32 size, u32 memAddr, u32 addr)
+{
+    if(!isInP9(addr, 0x20, memAddr, size)) return false;
+
+    const u8 *fnc = pos + (addr - memAddr);
+    for(u32 i = 0; i + 4 <= 0x20; i += 2)
+        if(read32Unaligned(fnc + i) == 0xE0C046F8) return true;
+
+    return false;
+}
+
+//Fixes FSPXI:ReadFileSHA256 on NoCrypto gamecard NCCHs (upstream LumaTeam/Luma3DS#1827, PR #1829 by Popax21).
+//LuxiOS: every address is range-checked, words are read unaligned-safe, the scan is bounded, and the vtable
+//entries are only replaced if both are distinct and really are the stub, so a mismatch just skips the fix
 u32 patchReadFileSHA256Vtab11(u8 *pos, u32 size, u32 process9MemAddr)
 {
     static const u8 ncchVtableRefPattern[] = {0x77, 0x46, 0x06, 0x74, 0x47, 0x74};
@@ -1033,44 +1065,74 @@ u32 patchReadFileSHA256Vtab11(u8 *pos, u32 size, u32 process9MemAddr)
     u32 shaVtable2Addr;
     if(!getVtableAddress(pos, size, shaVtable2RefPattern, sizeof(shaVtable2RefPattern), -2, process9MemAddr, &shaVtable2Addr)) return 1;
 
-    u32 *ncchVtable11Ptr = (u32 *)(pos + (ncchVtableAddr - process9MemAddr)) + 11,
-        *shaVtable1_11Ptr = (u32 *)(pos + (shaVtable1Addr - process9MemAddr)) + 11,
-        *shaVtable2_11Ptr = (u32 *)(pos + (shaVtable2Addr - process9MemAddr)) + 11;
+    if(shaVtable1Addr == shaVtable2Addr || shaVtable1Addr == ncchVtableAddr || shaVtable2Addr == ncchVtableAddr) return 1;
 
-    if((*ncchVtable11Ptr & 0x1) == 0 || (*shaVtable1_11Ptr & 0x1) == 0 || (*shaVtable2_11Ptr & 0x1) == 0) return 1; //Must be Thumb
+    u8 *ncchVtable11Ptr = pos + (ncchVtableAddr - process9MemAddr) + 11 * 4,
+       *shaVtable1_11Ptr = pos + (shaVtable1Addr - process9MemAddr) + 11 * 4,
+       *shaVtable2_11Ptr = pos + (shaVtable2Addr - process9MemAddr) + 11 * 4;
+
+    u32 ncchWriteAddr = read32Unaligned(ncchVtable11Ptr),
+        sha1WriteAddr = read32Unaligned(shaVtable1_11Ptr),
+        sha2WriteAddr = read32Unaligned(shaVtable2_11Ptr);
+
+    if((ncchWriteAddr & 0x1) == 0 || (sha1WriteAddr & 0x1) == 0 || (sha2WriteAddr & 0x1) == 0) return 1; //Must be Thumb
+
+    //Only replace what we know: the stubbed Write returning 0xE0C046F8
+    if(!isReadFileSHA256Stub(pos, size, process9MemAddr, sha1WriteAddr & ~0x1) ||
+       !isReadFileSHA256Stub(pos, size, process9MemAddr, sha2WriteAddr & ~0x1)) return 1;
 
     //Find needed function addresses by inspecting all bl branch targets
-    u16 *ncchWriteFnc = (u16 *)(pos + ((*ncchVtable11Ptr & ~0x1) - process9MemAddr));
-    if(*(u32 *)ncchWriteFnc != 0x0005b5f0) return 1; //Check if we got the right function
+    if(!isInP9(ncchWriteAddr & ~0x1, 4, process9MemAddr, size)) return 1;
+    u8 *ncchWriteFnc = pos + ((ncchWriteAddr & ~0x1) - process9MemAddr);
+    if(read32Unaligned(ncchWriteFnc) != 0x0005b5f0) return 1; //Check if we got the right function
 
-    readFileSHA256Vtab11PatchCtorPtr = readFileSHA256Vtab11PatchInitPtr = readFileSHA256Vtab11PatchProcessPtr = 0;
+    u32 ctorPtr = 0, initPtr = 0, processPtr = 0;
+    bool foundPop = false;
 
-    for(; ((*ncchWriteFnc) & 0xff00) != 0xbd00; ncchWriteFnc++) { //Stop whe encountering a pop {..., pc}
-        if((ncchWriteFnc[0] & 0xf800) != 0xf000 || (ncchWriteFnc[1] & 0xf800) != 0xf800) continue; //Check the instruction opcode
+    for(u32 i = 0; i < 0x200 && ncchWriteFnc + i + 4 <= pos + size; i += 2)
+    {
+        u16 instr0 = ncchWriteFnc[i] | (ncchWriteFnc[i + 1] << 8),
+            instr1 = ncchWriteFnc[i + 2] | (ncchWriteFnc[i + 3] << 8);
 
-        s32 callOff = ((ncchWriteFnc[0] & 0x07ff) << 11) | (ncchWriteFnc[1] & 0x07ff);
+        if((instr0 & 0xff00) == 0xbd00) //Stop when encountering a pop {..., pc}
+        {
+            foundPop = true;
+            break;
+        }
+
+        if((instr0 & 0xf800) != 0xf000 || (instr1 & 0xf800) != 0xf800) continue; //Check the instruction opcode
+
+        s32 callOff = ((instr0 & 0x07ff) << 11) | (instr1 & 0x07ff);
         callOff = (callOff & 0x1fffff) - (callOff & 0x200000);
 
-        u32 callTargetAddr = process9MemAddr + ((u8 *)ncchWriteFnc - pos) + 4 + 2*callOff;
+        u32 callTargetAddr = (ncchWriteAddr & ~0x1) + i + 4 + 2*callOff;
 
-        if(callTargetAddr < process9MemAddr || callTargetAddr >= process9MemAddr + size) return false;
+        if(!isInP9(callTargetAddr, 4, process9MemAddr, size)) return 1;
 
-        switch(*(u32 *)(pos + (callTargetAddr - process9MemAddr))) {
+        switch(read32Unaligned(pos + (callTargetAddr - process9MemAddr)))
+        {
             case 0x60422201: //DataChainProcessor::DataChainProcessor
-                readFileSHA256Vtab11PatchCtorPtr = callTargetAddr | 0x1;
+                ctorPtr = callTargetAddr | 0x1;
                 break;
             case 0x000db538: //DataChainProcessor::Init
-                readFileSHA256Vtab11PatchInitPtr = callTargetAddr | 0x1;
+                initPtr = callTargetAddr | 0x1;
                 break;
             case 0x0006b5f0: //DataChainProcessor::ProcessBytes
-                readFileSHA256Vtab11PatchProcessPtr = callTargetAddr | 0x1;
+                processPtr = callTargetAddr | 0x1;
                 break;
         }
     }
 
-    if(readFileSHA256Vtab11PatchCtorPtr == 0 || readFileSHA256Vtab11PatchInitPtr == 0 || readFileSHA256Vtab11PatchProcessPtr == 0) return 1;
+    if(!foundPop || ctorPtr == 0 || initPtr == 0 || processPtr == 0) return 1;
 
-    *shaVtable1_11Ptr = *shaVtable2_11Ptr = (u32) &readFileSHA256Vtab11Patch; //The patched vtable11 function is in ITCM, so we don't have to copy it somewhere else
+    readFileSHA256Vtab11PatchCtorPtr = ctorPtr;
+    readFileSHA256Vtab11PatchInitPtr = initPtr;
+    readFileSHA256Vtab11PatchProcessPtr = processPtr;
+
+    //The patched vtable11 function is in ITCM, so we don't have to copy it somewhere else
+    u32 patchAddr = (u32)&readFileSHA256Vtab11Patch;
+    memcpy(shaVtable1_11Ptr, &patchAddr, 4);
+    memcpy(shaVtable2_11Ptr, &patchAddr, 4);
 
     return 0;
 }
