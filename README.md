@@ -25,6 +25,13 @@
 - **Plugins:** an always-true condition in the kernel's APT hook sent plugins false "HOME menu" events, desyncing plugin state (plausibly upstream [#2254](https://github.com/LumaTeam/Luma3DS/issues/2254), System Settings crashing with a plugin loaded).
 - **Kernel extension:** a NULL dereference when asking for the owner of an ownerless object; a session table that stopped removing entries once full (dangling pointers); a handle-list call that could overrun Rosalina's buffer (now takes an optional limit, still compatible with existing homebrew).
 - **GDB debugger:** a memory-read request could overflow a stack buffer by up to 2 GB; IO memory access used wrong offsets; memory search used the wrong data; packets could overrun the receive buffer by 2 bytes; watchpoints leaked a lock (later hang), removed the wrong slot, and weren't all cleared on detach.
+- **Screenshots:** when memory was low (common on Old 3DS, or with 3D/800px top screens), screenshots were saved in chunks and every chunk after the first was written past its buffer in kernel mode, which could crash the console or save garbage.
+- **Rebooting into DS/GBA games or System Settings** could crash the process manager if an optional calibration value couldn't be read (possible on models without the New 3DS face-tracking camera).
+- **Menu combo:** closing the lid while changing it set the combo to "nothing", so the menu reopened nonstop until reboot.
+- **Wi-Fi:** "Disable forced wireless connection" couldn't actually release a forced connection; 32-character network names could garble the slot list.
+- **Time zones:** offsets like UTC−03:30 were shown as −04:30, and choosing "−03:30" applied −02:30.
+- **Screen filters:** *Invert* also inverted color temperature, contrast and gamma (invert + warm gave plain white instead of warm white).
+- **Plugins:** plugin memory could contain leftover data from other programs (only a quarter of each block was cleared).
 - **Shutdown:** Rosalina's service loop could spin forever during cleanup if an unsubscribe failed.
 - **Network time (NTP):** no longer freezes the console if the time server's reply is lost (likely upstream #2195); the synced clock is no longer up to 1 s fast; times after 2036 are handled.
 - **Community fixes merged from open upstream pull requests:** Local Play and StreetPass work again after Rosalina's networking was used ([#2262](https://github.com/LumaTeam/Luma3DS/pull/2262)), and opening the menu no longer freezes some games while the GPU is busy ([#2232](https://github.com/LumaTeam/Luma3DS/pull/2232), with a time limit added to its wait loop).
