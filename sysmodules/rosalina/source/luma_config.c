@@ -85,7 +85,7 @@ void LumaConfig_ConvertComboToString(char *out, u32 combo)
         out[-1] = 0;
 }
 
-static size_t LumaConfig_SaveLumaIniConfigToStr(char *out, const CfgData *cfg)
+static size_t LumaConfig_SaveLumaIniConfigToStr(char *out, size_t outSize, const CfgData *cfg)
 {
     char lumaVerStr[64];
     char lumaRevSuffixStr[16];
@@ -132,9 +132,9 @@ static size_t LumaConfig_SaveLumaIniConfigToStr(char *out, const CfgData *cfg)
     }
 
     if (GET_VERSION_REVISION(version) != 0) {
-        sprintf(lumaVerStr, "Luma3DS v%d.%d.%d", (int)GET_VERSION_MAJOR(version), (int)GET_VERSION_MINOR(version), (int)GET_VERSION_REVISION(version));
+        sprintf(lumaVerStr, "LuxiOS v%d.%d.%d", (int)GET_VERSION_MAJOR(version), (int)GET_VERSION_MINOR(version), (int)GET_VERSION_REVISION(version));
     } else {
-        sprintf(lumaVerStr, "Luma3DS v%d.%d",  (int)GET_VERSION_MAJOR(version), (int)GET_VERSION_MINOR(version));
+        sprintf(lumaVerStr, "LuxiOS v%d.%d",  (int)GET_VERSION_MAJOR(version), (int)GET_VERSION_MINOR(version));
     }
 
     if (isRelease) {
@@ -162,8 +162,8 @@ static size_t LumaConfig_SaveLumaIniConfigToStr(char *out, const CfgData *cfg)
     floatToString(bottomScreenFilterContrastStr, cfg->bottomScreenFilter.contrast, 6, false);
     floatToString(bottomScreenFilterBrightnessStr, cfg->bottomScreenFilter.brightness, 6, false);
 
-    int n = sprintf(
-        out, (const char *)config_template_ini,
+    int n = snprintf(
+        out, outSize, (const char *)config_template_ini,
         lumaVerStr, lumaRevSuffixStr,
 
         (int)cfg->formatVersionMajor, (int)cfg->formatVersionMinor,
@@ -258,9 +258,9 @@ Result LumaConfig_SaveSettings(void)
     configData.autobootTwlTitleId = autobootTwlTitleId;
     configData.autobootCtrAppmemtype = autobootCtrAppmemtype;
 
-    size_t n = LumaConfig_SaveLumaIniConfigToStr(inibuf, &configData);
+    size_t n = LumaConfig_SaveLumaIniConfigToStr(inibuf, sizeof(inibuf), &configData);
 
-    // FIXME: this is UB we should port snprintf sometime (as well as fix other tech debt in Rosalina)
+    // snprintf returns the untruncated length, so this catches truncation without overflowing
     if (n + 1 >= sizeof(inibuf)) {
         __builtin_trap();
     }

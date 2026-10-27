@@ -589,7 +589,7 @@ static int configIniHandler(void* user, const char* section, const char* name, c
     }
 }
 
-static size_t saveLumaIniConfigToStr(char *out)
+static size_t saveLumaIniConfigToStr(char *out, size_t outSize)
 {
     const CfgData *cfg = &configData;
 
@@ -628,9 +628,9 @@ static size_t saveLumaIniConfigToStr(char *out)
     }
 
     if (VERSION_BUILD != 0) {
-        sprintf(lumaVerStr, "Luma3DS v%d.%d.%d", (int)VERSION_MAJOR, (int)VERSION_MINOR, (int)VERSION_BUILD);
+        sprintf(lumaVerStr, "LuxiOS v%d.%d.%d", (int)VERSION_MAJOR, (int)VERSION_MINOR, (int)VERSION_BUILD);
     } else {
-        sprintf(lumaVerStr, "Luma3DS v%d.%d", (int)VERSION_MAJOR, (int)VERSION_MINOR);
+        sprintf(lumaVerStr, "LuxiOS v%d.%d", (int)VERSION_MAJOR, (int)VERSION_MINOR);
     }
 
     if (ISRELEASE) {
@@ -658,8 +658,8 @@ static size_t saveLumaIniConfigToStr(char *out)
     encodedFloatToString(bottomScreenFilterContrastStr, cfg->bottomScreenFilter.contrastEnc);
     encodedFloatToString(bottomScreenFilterBrightnessStr, cfg->bottomScreenFilter.brightnessEnc);
 
-    int n = sprintf(
-        out, (const char *)config_template_ini,
+    int n = snprintf(
+        out, outSize, (const char *)config_template_ini,
         lumaVerStr, lumaRevSuffixStr,
 
         (int)CONFIG_VERSIONMAJOR, (int)CONFIG_VERSIONMINOR,
@@ -708,9 +708,9 @@ static bool readLumaIniConfig(void)
 
 static bool writeLumaIniConfig(void)
 {
-    size_t n = saveLumaIniConfigToStr(tmpIniBuffer);
+    size_t n = saveLumaIniConfigToStr(tmpIniBuffer, sizeof(tmpIniBuffer));
 
-    // FIXME: this is UB we should port snprintf sometime (as well as fix other tech debt)
+    // snprintf returns the untruncated length, so this catches truncation without overflowing
     if (n + 1 >= sizeof(tmpIniBuffer)) {
         error("Configuration data buffer overflow, please report this issue");
         __builtin_unreachable();
@@ -880,7 +880,7 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
 
                                                  "Activate a PIN lock.\n\n"
                                                  "The PIN will be asked each time\n"
-                                                 "Luma3DS boots.\n\n"
+                                                 "LuxiOS boots.\n\n"
                                                  "4, 6 or 8 digits can be selected.\n\n"
                                                  "The ABXY buttons and the directional\n"
                                                  "pad buttons can be used as keys.\n\n"
@@ -945,7 +945,7 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
                                                  "when booting GBA games.",
 
                                                 // Should always be the last 2 entries
-                                                "Boot to the Luma3DS chainloader menu.",
+                                                "Boot to the LuxiOS chainloader menu.",
 
                                                  "Save the changes and exit. To discard\n"
                                                  "any changes press the POWER button.\n"
