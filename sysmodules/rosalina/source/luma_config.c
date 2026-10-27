@@ -125,7 +125,7 @@ void LumaConfig_ConvertComboToString(char *out, u32 combo)
     out[0] = 0;
     for(s32 i = 31; i >= 0; i--)
     {
-        if(combo & (1 << i))
+        if(combo & (1u << i))
         {
             strcpy(out, keys[i]);
             out += strlen(keys[i]);

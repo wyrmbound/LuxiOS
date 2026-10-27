@@ -311,7 +311,7 @@ static void menuComboToString(char *out, u32 combo)
     out[0] = 0;
     for(int i = 31; i >= 0; i--)
     {
-        if(combo & (1 << i))
+        if(combo & (1u << i))
         {
             strcpy(out, keyNames[i]);
             out += strlen(keyNames[i]);
