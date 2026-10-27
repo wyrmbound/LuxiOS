@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -67,7 +68,7 @@ SessionInfo *SessionInfo_Lookup(KSession *session)
 
     SessionInfo *ret;
     u32 id = SessionInfo_FindClosestSlot(session);
-    if(id == nbActiveSessions)
+    if(id == nbActiveSessions || sessionInfos[id].session != session) // closest slot may be a neighbour
         ret = NULL;
     else
         ret = (void **)(sessionInfos[id].session->autoObject.vtable) == customSessionVtable ? &sessionInfos[id] : NULL;
@@ -139,16 +140,11 @@ void SessionInfo_Remove(KSession *session)
     KRecursiveLock__Lock(criticalSectionLock);
     KRecursiveLock__Lock(&sessionInfosLock);
 
-    if(nbActiveSessions == MAX_SESSION)
-    {
-        KRecursiveLock__Unlock(&sessionInfosLock);
-        KRecursiveLock__Unlock(criticalSectionLock);
-        return;
-    }
-
+    // (No "table full" check here: removing must still work when the table is full,
+    // otherwise entries for destroyed sessions would stay forever as dangling pointers)
     u32 id = SessionInfo_FindClosestSlot(session);
 
-    if(id == nbActiveSessions)
+    if(id == nbActiveSessions || sessionInfos[id].session != session) // closest slot may be a neighbour
     {
         KRecursiveLock__Unlock(&sessionInfosLock);
         KRecursiveLock__Unlock(criticalSectionLock);

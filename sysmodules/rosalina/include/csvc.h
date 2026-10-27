@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 /*   This paricular file is licensed under the following terms: */
 
 /*
@@ -166,7 +167,7 @@ Result svcTranslateHandle(u32 *outKAddr, char *outClassName, Handle in);
 /// Operations for svcControlProcess
 typedef enum ProcessOp
 {
-    PROCESSOP_GET_ALL_HANDLES,  ///< List all handles of the process, varg3 can be either 0 to fetch all handles, or token of the type to fetch
+    PROCESSOP_GET_ALL_HANDLES,  ///< List all handles of the process, varg3 bits 0-7: 0 to fetch all handles, or token of the type to fetch; bits 16-31: max handles to write to outBuf (0 = no limit)
                                 ///< s32 count = svcControlProcess(handle, PROCESSOP_GET_ALL_HANDLES, (u32)&outBuf, 0)
                                 ///< Returns how many handles were found
 

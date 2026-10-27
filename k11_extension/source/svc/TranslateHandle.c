@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -36,7 +37,7 @@ Result TranslateHandle(u32 *outKAddr, char *outClassName, Handle handle)
 
     if(handle == CUR_THREAD_HANDLE)
     {
-        obj = (KAutoObject *)currentCoreContext->objectContext.currentProcess;
+        obj = (KAutoObject *)currentCoreContext->objectContext.currentThread;
         KAutoObject__AddReference(obj);
     }
     else if(handle == CUR_PROCESS_HANDLE)

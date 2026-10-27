@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 #include "svc/ControlProcess.h"
 #include "memory.h"
 #include "mmu.h"
@@ -53,7 +54,10 @@ Result  ControlProcess(Handle processHandle, ProcessOp op, u32 varg2, u32 varg3)
             KProcessHandleTable *table = handleTableOfProcess(process);
             u32                 *originalHandleList = (u32 *)varg2;
             u32                 count = 0;
-            u32                 searchForToken = varg3;
+            // Bits 0-7: class token to match (0 = all). Bits 16-31: max number of handles to write
+            // (0 = no limit, for compatibility with existing callers)
+            u32                 searchForToken = varg3 & 0xFF;
+            u32                 maxCount = varg3 >> 16;
             HandleDescriptor    *handleDesc = table->handleTable == NULL ? table->internalTable : table->handleTable;
 
             for (u32 idx = 0; idx < (u32)table->maxHandleCount; ++idx, ++handleDesc)
@@ -69,6 +73,9 @@ Result  ControlProcess(Handle processHandle, ProcessOp op, u32 varg2, u32 varg3)
                     if (searchForToken != token.flags)
                         continue;
                 }
+
+                if (maxCount != 0 && count >= maxCount)
+                    break;
 
                 *originalHandleList++ = idx | ((handleDesc->info << 16) >> 1);
                 ++count;

@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -108,7 +109,11 @@ Result GetHandleInfoHook(s64 *out, Handle handle, u32 type)
                 }
 
                 if (owner == NULL)
+                {
+                    // Object type without an owner: don't create a handle to NULL
                     res =  0xD8E007F7;
+                    break;
+                }
 
                 res = createHandleForThisProcess(&hOut, (KAutoObject *)owner);
                 *out = hOut;
