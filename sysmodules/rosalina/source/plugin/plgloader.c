@@ -153,6 +153,12 @@ void     PluginLoader__HandleCommands(void *_ctx)
                 break;
             }
 
+            // The previous plugin's cleanup (WaitForProcessTerminated, on the task runner) still uses ctx->target
+            // and the memory block: wait for it (at most ~3 s; it gives up after 2.5 s) instead of overwriting the
+            // handle and having the cleanup unmap/free the new process's plugin memory
+            for (u32 i = 0; i < 60 && PLG__GetConfigMemoryStatus() == PLG_CFG_EXITING; i++)
+                svcSleepThread(50 * 1000 * 1000LL);
+
             ctx->plgEvent = PLG_OK;
             svcOpenProcess(&ctx->target, cmdbuf[1]);
 
@@ -235,8 +241,12 @@ void     PluginLoader__HandleCommands(void *_ctx)
             params->persistent = (cmdbuf[1] >> 16) & 0x1;
             params->lowTitleId = cmdbuf[2];
 
-            strncpy(params->path, (const char *)cmdbuf[4], 255);
-            memcpy(params->config, (void *)cmdbuf[6], 32 * sizeof(u32));
+            // Never read more than the client's buffers hold (descriptor size = cmdbuf[n] >> 4)
+            u32 pathBufSize = cmdbuf[3] >> 4, configBufSize = cmdbuf[5] >> 4;
+            memset(params->path, 0, sizeof(params->path));
+            strncpy(params->path, (const char *)cmdbuf[4], pathBufSize < sizeof(params->path) - 1 ? pathBufSize : sizeof(params->path) - 1);
+            memset(params->config, 0, sizeof(params->config));
+            memcpy(params->config, (void *)cmdbuf[6], configBufSize < sizeof(params->config) ? configBufSize : sizeof(params->config));
 
             if (params->persistent)
             {
@@ -352,8 +362,19 @@ void     PluginLoader__HandleCommands(void *_ctx)
                 break;
             }
 
+            // pluginPath is NULL until a plugin has been loaded (strncpy from NULL crashed Rosalina), and the
+            // client's buffer may be smaller than 255 bytes
             char *path = (char *)cmdbuf[2];
-            strncpy(path, ctx->pluginPath, 255);
+            u32 pathBufSize = cmdbuf[1] >> 4;
+            if (pathBufSize > 255) pathBufSize = 255;
+            if (pathBufSize != 0)
+            {
+                if (ctx->pluginPath != NULL)
+                    strncpy(path, ctx->pluginPath, pathBufSize - 1);
+                else
+                    path[0] = 0;
+                path[pathBufSize - 1] = 0;
+            }
 
             cmdbuf[0] = IPC_MakeHeader(10, 1, 2);
             cmdbuf[1] = 0;
@@ -455,6 +476,7 @@ void     PluginLoader__HandleCommands(void *_ctx)
 
             ctx->useUserLoadParameters = false;
             memset(&ctx->userLoadParameters, 0, sizeof(PluginLoadParameters));
+            cmdbuf[0] = IPC_MakeHeader(14, 1, 0); // was never set: the result wasn't sent back
 
             FS_Archive sd;
             if(R_SUCCEEDED(FSUSER_OpenArchive(&sd, ARCHIVE_SDMC, fsMakePath(PATH_EMPTY, ""))))
@@ -543,8 +565,7 @@ static void WaitForProcessTerminated(void *arg)
     }
     // Terminate process
     svcCloseHandle(ctx->target);
-    // Reset plugin loader state
-    PLG__SetConfigMemoryStatus(PLG_CFG_NONE);
+    // Reset plugin loader state. PLG_CFG_NONE is set last: a new load waits for it before reusing ctx->target
     ctx->pluginIsSwapped = false;
     ctx->pluginIsHome = false;
     ctx->target = 0;
@@ -555,6 +576,7 @@ static void WaitForProcessTerminated(void *arg)
     ctx->isMemPrivate = false;
     g_blockMenuOpen = 0;
     MemoryBlock__ResetSwapSettings();
+    PLG__SetConfigMemoryStatus(PLG_CFG_NONE);
 }
 
 void    PluginLoader__HandleKernelEvent(u32 notifId)
