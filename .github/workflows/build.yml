@@ -1,0 +1,46 @@
+name: Build LuxiOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+
+    steps:
+      - name: "Check out with tags (the version comes from git describe)"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install firmtool, makerom and clang
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3-pip unzip curl clang git
+          pip3 install --break-system-packages git+https://github.com/TuxSH/firmtool.git
+          curl -fsSL -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.19.0/makerom-v0.19.0-ubuntu_x86_64.zip
+          unzip -o makerom.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/makerom
+
+      - name: Build boot.firm
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make -j"$(nproc)"
+
+      - name: Host tests
+        run: |
+          failed=0
+          for t in luxios-tools/tests/run_*_test.sh; do
+            echo "== $t"
+            bash "$t" || failed=1
+          done
+          exit $failed
+
+      - name: Upload boot.firm
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuxiOS-boot.firm
+          path: boot.firm
