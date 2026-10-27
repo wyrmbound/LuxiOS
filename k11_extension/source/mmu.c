@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 #include "mmu.h"
 #include "globals.h"
 #include "utils.h"
@@ -101,6 +102,10 @@ void    L2MMUTable__RWXForAll(u32 *table)
 
 u32     L1MMUTable__GetPAFromVA(u32 *table, u32 va)
 {
+    // Process L1 tables only cover the user range (1024 entries); higher addresses read past the table
+    if (va >= 0x40000000)
+        return 0;
+
     u32             pa = 0;
     L1Descriptor    descriptor = {table[va >> 20]};
 
@@ -161,6 +166,10 @@ u32     L2MMUTable__GetPAFromVA(u32 *table, u32 va)
 
 u32     L1MMUTable__GetAddressUserPerm(u32 *table, u32 va)
 {
+    // Process L1 tables only cover the user range (1024 entries); higher addresses read past the table
+    if (va >= 0x40000000)
+        return 0;
+
     u32             perm = 0;
     L1Descriptor    descriptor = {table[va >> 20]};
 
