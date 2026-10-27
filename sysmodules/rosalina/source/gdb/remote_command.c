@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS.
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   SPDX-License-Identifier: (MIT OR GPL-2.0-or-later)
@@ -105,7 +106,7 @@ GDB_DECLARE_REMOTE_COMMAND_HANDLER(SyncRequestInfo)
     u32 cmdId;
     ThreadContext regs;
     u32 instr;
-    Handle process;
+    Handle process = 0, handle = 0; // closed at 'end' even on early exits
     r = svcOpenProcess(&process, ctx->pid);
     if(R_FAILED(r))
     {
@@ -147,7 +148,6 @@ GDB_DECLARE_REMOTE_COMMAND_HANDLER(SyncRequestInfo)
     }
 
     char name[12];
-    Handle handle;
     r = svcCopyHandle(&handle, CUR_PROCESS_HANDLE, (Handle)regs.cpu_registers.r[0], process);
     if(R_FAILED(r))
     {
@@ -199,7 +199,7 @@ GDB_DECLARE_REMOTE_COMMAND_HANDLER(TranslateHandle)
     Result r;
     u32 kernelAddr;
     s64 token;
-    Handle handle, process;
+    Handle handle = 0, process = 0; // closed at 'end' even on early exits
     s64 refcountRaw;
     u32 refcount;
     char classBuf[32], serviceBuf[12] = {0}, ownerBuf[50] = { 0 };
@@ -297,7 +297,7 @@ GDB_DECLARE_REMOTE_COMMAND_HANDLER(ListAllHandles)
         goto end;
     }
 
-    if (R_FAILED(count = svcControlProcess(process, PROCESSOP_GET_ALL_HANDLES, (u32)procHandles, val)))
+    if (R_FAILED(count = svcControlProcess(process, PROCESSOP_GET_ALL_HANDLES, (u32)procHandles, (val & 0xFF) | (sizeof(procHandles) / sizeof(procHandles[0])) << 16)))
         n = sprintf(outbuf, "An error occured: %08lX\n", count);
     else if (count == 0)
         n = sprintf(outbuf, "Process has no handles ?\n");

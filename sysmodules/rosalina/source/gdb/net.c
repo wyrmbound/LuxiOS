@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS.
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   SPDX-License-Identifier: (MIT OR GPL-2.0-or-later)
@@ -233,7 +234,8 @@ int GDB_ReceivePacket(GDBContext *ctx)
         char *pos;
         for(pos = ctx->buffer; pos < ctx->buffer + maxlen && *pos != '#'; pos++);
 
-        if(pos == ctx->buffer + maxlen) // malformed packet
+        // Malformed packet, or no room left for the '#' and the 2 checksum characters
+        if(pos == ctx->buffer + maxlen || pos + 3 > ctx->buffer + sizeof(ctx->buffer))
             return -1;
 
         else

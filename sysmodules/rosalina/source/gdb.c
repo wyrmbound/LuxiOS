@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS.
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   SPDX-License-Identifier: (MIT OR GPL-2.0-or-later)
@@ -119,11 +120,9 @@ void GDB_DetachFromProcess(GDBContext *ctx)
     memset(&ctx->breakpoints, 0, sizeof(ctx->breakpoints));
     ctx->nbBreakpoints = 0;
 
-    for(u32 i = 0; i < ctx->nbWatchpoints; i++)
-    {
-        GDB_RemoveWatchpoint(ctx, ctx->watchpoints[i], WATCHPOINT_DISABLED);
-        ctx->watchpoints[i] = 0;
-    }
+    // GDB_RemoveWatchpoint shifts the list down, so always remove the first entry
+    while(ctx->nbWatchpoints > 0 && GDB_RemoveWatchpoint(ctx, ctx->watchpoints[0], WATCHPOINT_DISABLED) == 0);
+    memset(ctx->watchpoints, 0, sizeof(ctx->watchpoints));
     ctx->nbWatchpoints = 0;
 
     svcKernelSetState(0x10002, ctx->pid, false);

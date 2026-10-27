@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS.
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   SPDX-License-Identifier: (MIT OR GPL-2.0-or-later)
@@ -37,12 +38,12 @@ Result GDB_ReadTargetMemoryInPage(void *out, GDBContext *ctx, u32 addr, u32 len)
                 }
                 else if((addr + off) & 3)
                 {
-                    *((u16 *)out + off) = *(vu16 *)(addr + off);
+                    *(u16 *)((u8 *)out + off) = *(vu16 *)(addr + off);
                     off += 2;
                 }
                 else
                 {
-                    *((u32 *)out + off) = *(vu32 *)(addr + off);
+                    *(u32 *)((u8 *)out + off) = *(vu32 *)(addr + off);
                     off += 4;
                 }
             }
@@ -86,12 +87,12 @@ Result GDB_WriteTargetMemoryInPage(GDBContext *ctx, const void *in, u32 addr, u3
                 }
                 else if((addr + off) & 3)
                 {
-                    *(vu16 *)(addr + off) = *((u16 *)in + off);
+                    *(vu16 *)(addr + off) = *(const u16 *)((const u8 *)in + off);
                     off += 2;
                 }
                 else
                 {
-                    *(vu32 *)(addr + off) = *((u32 *)in + off);
+                    *(vu32 *)(addr + off) = *(const u32 *)((const u8 *)in + off);
                     off += 4;
                 }
             }
@@ -173,7 +174,7 @@ int GDB_SendMemory(GDBContext *ctx, const char *prefix, u32 prefixLen, u32 addr,
     else
         prefixLen = 0;
 
-    if(prefixLen + 2 * len > GDB_BUF_LEN) // gdb shouldn't send requests which responses don't fit in a packet
+    if(len > (GDB_BUF_LEN - prefixLen) / 2) // (overflow-safe) gdb shouldn't send requests which responses don't fit in a packet
         return prefix == NULL ? GDB_ReplyErrno(ctx, ENOMEM) : -1;
 
     u32 total = GDB_ReadTargetMemory(membuf, ctx, addr, len);
@@ -210,9 +211,10 @@ u32 GDB_SearchMemory(bool *found, GDBContext *ctx, u32 addr, u32 len, const void
 
         for(nbPages = 0; nbPages < maxNbPages; nbPages++)
         {
-            if(addr >= (1u << (32 - (u32)TTBCR)))
+            u32 pageAddr = addrBase + nbPages * 0x1000;
+            if(pageAddr >= (1u << (32 - (u32)TTBCR)))
             {
-                u32 PA = svcConvertVAToPA((const void *)addr, false);
+                u32 PA = svcConvertVAToPA((const void *)pageAddr, false);
                 if(PA == 0 || (PA >= 0x10000000 && PA <= 0x18000000))
                     break;
             }
@@ -322,7 +324,7 @@ GDB_DECLARE_QUERY_HANDLER(SearchMemory)
 
     patternLen = GDB_UnescapeBinaryData(pattern, patternStart, patternLen);
 
-    foundAddr = GDB_SearchMemory(&found, ctx, addr, len, patternStart, patternLen);
+    foundAddr = GDB_SearchMemory(&found, ctx, addr, len, pattern, patternLen);
 
     if(found)
         return GDB_SendFormattedPacket(ctx, "1,%x", foundAddr);

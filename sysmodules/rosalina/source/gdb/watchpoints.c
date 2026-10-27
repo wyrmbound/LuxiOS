@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS.
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   SPDX-License-Identifier: (MIT OR GPL-2.0-or-later)
@@ -62,14 +63,23 @@ int GDB_AddWatchpoint(GDBContext *ctx, u32 address, u32 size, WatchpointKind kin
     u32 offset = address - (address & ~3);
 
     if(manager.total == 2)
+    {
+        RecursiveLock_Unlock(&watchpointManagerLock);
         return -EBUSY;
+    }
 
     if(size == 0 || (offset + size) > 4 || kind == WATCHPOINT_DISABLED)
+    {
+        RecursiveLock_Unlock(&watchpointManagerLock);
         return -EINVAL;
+    }
 
     if(GDB_GetWatchpointKind(ctx, address) != WATCHPOINT_DISABLED)
+    {
         // Disallow duplicate watchpoints: the kernel doesn't give us sufficient info to differentiate them by kind (DFSR)
+        RecursiveLock_Unlock(&watchpointManagerLock);
         return -EINVAL;
+    }
 
     u32 id = manager.watchpoints[0].kind == WATCHPOINT_DISABLED ? 0 : 1;
     u32 selectMask = ((1 << size) - 1) << offset;
@@ -110,7 +120,8 @@ int GDB_RemoveWatchpoint(GDBContext *ctx, u32 address, WatchpointKind kind)
     RecursiveLock_Lock(&watchpointManagerLock);
 
     u32 id;
-    for(id = 0; id < 2 && manager.watchpoints[id].address != address && manager.watchpoints[id].debug != ctx->debug; id++);
+    // Same match as GDB_GetWatchpointKind: both the address and the debugged process must match
+    for(id = 0; id < 2 && (manager.watchpoints[id].address != address || manager.watchpoints[id].debug != ctx->debug); id++);
 
     if(id == 2 || (kind != WATCHPOINT_DISABLED && manager.watchpoints[id].kind != kind))
     {
