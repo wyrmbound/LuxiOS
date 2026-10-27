@@ -29,6 +29,7 @@
 #include "menus.h"
 #include "menu.h"
 #include "draw.h"
+#include "luxi_sprite.h"
 #include "menus/process_list.h"
 #include "menus/n3ds.h"
 #include "menus/debugger.h"
@@ -227,8 +228,9 @@ void RosalinaMenu_ShowCredits(void)
     {
         Draw_Lock();
         Draw_DrawString(10, 10, COLOR_TITLE, "LuxiOS credits");
+        Draw_DrawSprite(SCREEN_BOT_WIDTH - 10 - LUXI_SPRITE_SIZE, 8, LUXI_SPRITE_SIZE, LUXI_SPRITE_SIZE, luxiSprite);
 
-        u32 posY = Draw_DrawString(10, 30, COLOR_WHITE, "LuxiOS: AI-assisted fork of Luma3DS (GPLv3)");
+        u32 posY = Draw_DrawString(10, 30, COLOR_WHITE, "LuxiOS: AI-assisted Luma3DS fork");
         posY = Draw_DrawString(10, posY + SPACING_Y, COLOR_WHITE, "Luma3DS (c) 2016-2026 LumaTeam") + SPACING_Y;
 
         posY = Draw_DrawString(10, posY + SPACING_Y, COLOR_WHITE, "3DSX loading code by fincs");

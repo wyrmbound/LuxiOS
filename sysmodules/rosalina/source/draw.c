@@ -76,6 +76,17 @@ void Draw_DrawCharacter(u32 posX, u32 posY, u32 color, char character)
 }
 
 
+void Draw_DrawSprite(u32 posX, u32 posY, u32 width, u32 height, const u16 *pixels)
+{
+    u16 *const fb = (u16 *)FB_BOTTOM_VRAM_ADDR;
+
+    for(u32 y = 0; y < height && posY + y < SCREEN_BOT_HEIGHT; y++)
+    {
+        for(u32 x = 0; x < width && posX + x < SCREEN_BOT_WIDTH; x++)
+            fb[(posX + x) * SCREEN_BOT_HEIGHT + (SCREEN_BOT_HEIGHT - 1 - posY - y)] = pixels[y * width + x];
+    }
+}
+
 u32 Draw_DrawString(u32 posX, u32 posY, u32 color, const char *string)
 {
     for(u32 i = 0, line_i = 0; i < strlen(string); i++)

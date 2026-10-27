@@ -73,7 +73,7 @@
 #define SPACING_Y 11
 #define SPACING_X 6
 
-#define COLOR_TITLE RGB565(0x00, 0x26, 0x1F)
+#define COLOR_TITLE RGB565(0x1E, 0x32, 0x09) // LuxiOS gold
 #define COLOR_WHITE RGB565(0x1F, 0x3F, 0x1F)
 #define COLOR_RED   RGB565(0x1F, 0x00, 0x00)
 #define COLOR_GREEN RGB565(0x00, 0x1F, 0x00)
@@ -92,6 +92,9 @@ u32 Draw_DrawString(u32 posX, u32 posY, u32 color, const char *string);
 
 __attribute__((format(printf,4,5)))
 u32 Draw_DrawFormattedString(u32 posX, u32 posY, u32 color, const char *fmt, ...);
+
+// Draws a row-major RGB565 image, clipped to the bottom screen
+void Draw_DrawSprite(u32 posX, u32 posY, u32 width, u32 height, const u16 *pixels);
 
 void Draw_FillFramebuffer(u32 value);
 void Draw_ClearFramebuffer(void);
