@@ -46,6 +46,7 @@ typedef struct CheatDescription
         u8 valid : 1;
         u8 hasKeyCode : 1;
         u8 activeStorage : 1;
+        u8 autoEnable : 1; // name starts with '*' (e.g. "[*60 FPS]"): turned on when the cheats are loaded
     };
     char name[39];
     u32 codesCount;
@@ -1684,6 +1685,7 @@ static CheatDescription* Cheat_AllocCheat()
     cheat->valid = 1;
     cheat->codesCount = 0;
     cheat->hasKeyCode = 0;
+    cheat->autoEnable = 0;
     cheat->storage1 = 0;
     cheat->storage2 = 0;
     cheat->name[0] = '\0';
@@ -1963,6 +1965,7 @@ static void Cheat_LoadCheatsIntoMemory(u64 titleId)
                 }
                 strncpy(cheat->name, line, 38);
                 cheat->name[38] = '\0';
+                cheat->autoEnable = strippedLine[0] == '*' || (strippedLine[0] == '[' && strippedLine[1] == '*');
             }
         }
     } while (R_SUCCEEDED(res) && cheatSize < sizeof(cheatBuffer));
@@ -1974,7 +1977,37 @@ static void Cheat_LoadCheatsIntoMemory(u64 titleId)
         cheatCount--; // Remove last empty cheat
     }
 
+    for (s32 i = 0; i < cheatCount; i++)
+    {
+        if (cheats[i]->autoEnable)
+            cheats[i]->active = 1;
+    }
+
     memset(cheatPage, 0, 0x1000);
+}
+
+static u32 Cheat_GetCurrentProcessAndTitleId(u64* titleId);
+
+// Loads the running game's cheats once per launch, so the ones marked with '*' apply without
+// opening the menu (upstream request #1619). Called from the menu thread every ~50 ms.
+static void Cheat_AutoLoad(void)
+{
+    static u64 lastTitleId = 0;
+    static u32 ticks = 0;
+
+    if (++ticks < 20) // check about once a second
+        return;
+    ticks = 0;
+
+    u64 titleId = 0;
+    Cheat_GetCurrentProcessAndTitleId(&titleId);
+    if (titleId == lastTitleId)
+        return;
+    lastTitleId = titleId;
+
+    // Don't reload (and reset the user's choices) if the menu already loaded this title's cheats
+    if (titleId != 0 && !(cheatCount != 0 && cheatTitleInfo == titleId))
+        Cheat_LoadCheatsIntoMemory(titleId);
 }
 
 static u32 Cheat_GetCurrentProcessAndTitleId(u64* titleId)
@@ -1999,6 +2032,8 @@ void Cheat_SeedRng(u64 seed)
 
 void Cheat_ApplyCheats(void)
 {
+    Cheat_AutoLoad();
+
     if (!cheatCount)
     {
         return;
