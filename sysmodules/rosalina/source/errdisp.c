@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -311,6 +312,12 @@ void ERRF_HandleCommands(void)
         {
             ERRF_PreprocessErrInfo(&info, (cmdbuf + 1));
             ERRF_SaveErrorToFile(&info);
+
+            // While the lid is closed or the system is going to sleep, wait to show the error instead of
+            // acknowledging it unseen: the failed app then kept running broken (black screen, upstream #2120)
+            while(menuShouldExit && !preTerminationRequested && info.type != ERRF_ERRTYPE_LOG_ONLY)
+                svcSleepThread(100 * 1000 * 1000LL);
+
             if(!menuShouldExit && info.type != ERRF_ERRTYPE_LOG_ONLY)
             {
                 menuEnter();
