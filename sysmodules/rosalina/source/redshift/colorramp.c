@@ -1,5 +1,6 @@
 /* colorramp.c -- color temperature calculation source
    This file is part of Redshift.
+   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 
    Redshift is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -286,6 +287,16 @@ interpolate_color(float a, const float *c1, const float *c2, float *c)
 void colorramp_get_white_point(float *out_white_point, int temperature)
 {
 	/* Approximate white point */
+	// LuxiOS: the table covers 1000K-25100K; at the ends (25100K is reachable from the menu and config) the
+	// interpolation used to read past the table. Clamp instead
+	static const int lastIndex = sizeof(blackbody_color) / sizeof(blackbody_color[0]) - 3;
+	if (temperature < 1000) temperature = 1000;
+	if (((temperature - 1000) / 100) * 3 >= lastIndex)
+	{
+		for (int i = 0; i < 3; i++)
+			out_white_point[i] = blackbody_color[lastIndex + i];
+		return;
+	}
 	float alpha = (temperature % 100) / 100.0;
 	int temp_index = ((temperature - 1000) / 100)*3;
 	interpolate_color(alpha, &blackbody_color[temp_index],

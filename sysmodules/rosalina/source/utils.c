@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -227,6 +228,6 @@ int floatToString(char *out, float f, u32 precision, bool pad)
         int n2 = n - 1;
         while (out[n2] == '0')
             out[n2--] = '\0';
-        return n2;
+        return n2 + 1; // length (n2 is the index of the last character)
     }
 }

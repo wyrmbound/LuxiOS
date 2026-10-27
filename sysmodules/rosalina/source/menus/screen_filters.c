@@ -546,7 +546,7 @@ Menu screenFiltersMenu = {
         { "[1900K] Candle", METHOD, .method = &ScreenFiltersMenu_SetCandle },
         { "[1200K] Ember", METHOD, .method = &ScreenFiltersMenu_SetEmber },
         { "[IPS recommended] Enhance top screen colors", METHOD, .method = &ScreenFiltersMenu_SetTopScreenSrgbColorCurve },
-        { "[IPS recommended] Enhance bottom screen colors", METHOD, .method = &ScreenFiltersMenu_SetTopScreenSrgbColorCurve },
+        { "[IPS recommended] Enhance bottom screen colors", METHOD, .method = &ScreenFiltersMenu_SetBottomScreenSrgbColorCurve },
         { "Advanced configuration...", METHOD, .method = &ScreenFiltersMenu_AdvancedConfiguration },
         {},
     }

@@ -248,7 +248,7 @@ Result LumaConfig_SaveSettings(void)
 
     Result res;
 
-    IFile file;
+    IFile file = { 0 }; // closed below even when it was never opened
     u64 total;
 
     CfgData configData;

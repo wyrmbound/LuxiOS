@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2021 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -131,7 +132,7 @@ Result IFile_Write(IFile *file, u64 *total, const void *buffer, u32 len, u32 fla
   while (1)
   {
     res = FSFILE_Write(file->handle, &written, file->pos, buf, left, flags);
-    if (R_FAILED(res))
+    if (R_FAILED(res) || written == 0) // 0 bytes written: no progress, don't loop forever
     {
       break;
     }

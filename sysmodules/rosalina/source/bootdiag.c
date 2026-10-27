@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2022  TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -43,7 +44,7 @@ static u8 CTR_ALIGN(0x1000) bootdiagThreadStack[0x1000];
 static int bootdiagDumpProcessList(char *buf)
 {
     int n = 0;
-    u32 pids[40];
+    u32 pids[0x40];
     s32 numProcesses = 0;
     if (R_FAILED(svcGetProcessList(&numProcesses, pids, 0x40))) __builtin_trap();
 
@@ -122,7 +123,7 @@ static void bootdiagThreadMain(void)
 
     IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, "/luma/bootdiag.txt"), FS_OPEN_CREATE | FS_OPEN_WRITE);
     u64 ttl = 0;
-    IFile_Write(file, &ttl, buf, (u32)n, 0);
+    IFile_Write(&file, &ttl, buf, (u32)n, 0);
     IFile_Close(&file);
 
     fsExit();
