@@ -1073,13 +1073,21 @@ void patchCode(u8 *code, u32 size, u32 codeSize, u64 progId, u16 progVer, u32 te
         // 32 00 5x E3 CMP             Rx, #0x32
         // ...
         // 32 x0 A0 C3 MOVGT           Rx, #0x32
-        u32 *off = (u32 *)code;
-        for (; (u8 *)off < code + textSize && ((off[0] & 0xFFF0FFFF) != 0xE3500032 || (off[2] & 0xFFFF0FFF) != 0xC3A00032); off++)
+        // Prefer a match where CMP and MOVGT use the same register (the old "continue" check didn't do anything);
+        // fall back to the first loose match, which is what was patched before
+        u32 *off, *loose = NULL;
+        for (off = (u32 *)code; (u8 *)(off + 3) <= code + textSize; off++)
         {
-            if (((off[0] >> 16) & 0xF) != ((off[2] >> 12) & 0xF)) // ensure same register used
+            if ((off[0] & 0xFFF0FFFF) != 0xE3500032 || (off[2] & 0xFFFF0FFF) != 0xC3A00032)
                 continue;
+            if (((off[0] >> 16) & 0xF) == ((off[2] >> 12) & 0xF))
+                break;
+            if (loose == NULL)
+                loose = off;
         }
-        if ((u8 *)off >= code + textSize) goto error;
+        if ((u8 *)(off + 3) > code + textSize)
+            off = loose;
+        if (off == NULL) goto error;
         off[0] = (off[0] & ~0xFF) | 99;
         off[2] = (off[2] & ~0xFF) | 99;
 
@@ -1257,7 +1265,8 @@ void patchCode(u8 *code, u32 size, u32 codeSize, u64 progId, u16 progVer, u32 te
         // Patch DLP client region check
         u8 *found = memsearch(code, pattern2, textSize, sizeof(pattern2));
 
-        if (!patchMemory(found, textSize,
+        // Unknown DLP version: skip the client patch instead of searching from NULL (data abort in loader)
+        if (found != NULL && !patchMemory(found, textSize - (u32)(found - code),
                pattern3,
                sizeof(pattern3), 1,
                patch2,

@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 #include <3ds.h>
 #include "paslr.h"
 #include "util.h"
@@ -159,7 +160,7 @@ Result allocateProgramMemory(const ExHeader_Info *exhi, u32 vaddr, u32 size)
     // Clean up on failure
     for (u32 j = 0; j < i; j++)
     {
-        u32 idx = chunkOrder[i];
+        u32 idx = chunkOrder[j]; // was [i]: freed the chunk that failed, i times, and leaked the allocated ones
         svcControlMemory(&tmp, chunkStartAddrs[idx], 0, chunkSizes[idx], MEMOP_FREE, MEMPERM_DONTCARE);
     }
 
