@@ -694,6 +694,33 @@ error:
     while(true);
 }
 
+bool overrideTitleRemasterVersion(u64 progId, u16 *remasterVersion)
+{
+    /* Here we look for "/luma/titles/[u64 titleID in hex, uppercase]/remaster.bin"
+       If it exists it should contain a 16-bit little-endian remaster version. Titles whose
+       remaster version is higher get it set to 0, so the update with the wanted version
+       is the one that loads (based on upstream PR #2170). Unlike exheader.bin, a malformed
+       file is ignored instead of crashing the system. */
+
+    char path[] = "/luma/titles/0000000000000000/remaster.bin";
+    progIdToStr(path + 28, progId);
+
+    IFile file;
+    u16 targetVersion;
+    u64 fileSize, total;
+
+    if(!openLumaFile(&file, path)) return false;
+
+    bool ok = R_SUCCEEDED(IFile_GetSize(&file, &fileSize)) && fileSize == sizeof(targetVersion) &&
+              R_SUCCEEDED(IFile_Read(&file, &total, &targetVersion, sizeof(targetVersion))) && total == sizeof(targetVersion);
+    IFile_Close(&file);
+
+    if(!ok || targetVersion >= *remasterVersion) return false;
+
+    *remasterVersion = 0;
+    return true;
+}
+
 static inline bool loadTitleLocaleConfig(u64 progId, u8 *mask, u8 *regionId, u8 *languageId, u8 *countryId, u8 *stateId)
 {
     /* Here we look for "/luma/titles/[u64 titleID in hex, uppercase]/locale.txt"
