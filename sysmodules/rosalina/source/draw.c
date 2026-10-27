@@ -389,7 +389,8 @@ static void Draw_ConvertFrameBufferLinesKernel(const FrameBufferConvertArgs *arg
             for(u32 x = 0; x < width; x++)
             {
                 __builtin_prefetch(addr + x * stride + y * formatSizes[fmt], 0, 3);
-                Draw_ConvertPixelToBGR8(args->buf + (x + width * (args->scaleFactorY * y + i)) * 3 , addr + x * stride + y * formatSizes[fmt], fmt);
+                // buf only holds this chunk, so index it from startingLine (writing past it in kernel mode otherwise)
+                Draw_ConvertPixelToBGR8(args->buf + (x + width * (args->scaleFactorY * (y - args->startingLine) + i)) * 3 , addr + x * stride + y * formatSizes[fmt], fmt);
             }
         }
     }

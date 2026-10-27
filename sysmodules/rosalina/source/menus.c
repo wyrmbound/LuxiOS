@@ -291,6 +291,12 @@ static Result RosalinaMenu_WriteScreenshot(IFile *file, u32 width, bool top, boo
         u32 available = (u32)(framebufferCacheEnd - buf);
         u32 size = available < remaining ? available : remaining;
         u32 nlines = size / (lineSize * scaleFactorY);
+        if (nlines == 0)
+        {
+            // Not even one line fits in the remaining memory: give up instead of looping forever
+            res = -1;
+            goto end;
+        }
         Draw_ConvertFrameBufferLines(buf, width, y, nlines, scaleFactorY, top, left);
 
         s64 t1 = svcGetSystemTick();
@@ -390,6 +396,7 @@ void RosalinaMenu_TakeScreenshot(void)
                 res = 0;
         }
         FSUSER_CloseArchive(archive);
+        archive = 0; // closed: don't close it again at 'end'
     }
     else
     {
@@ -517,6 +524,7 @@ void menuTakeSelfScreenshot(void)
         if((u32)res == 0xC82044BE) // directory already exists
             res = 0;
         FSUSER_CloseArchive(archive);
+        archive = 0; // closed: don't close it again at 'end'
     }
     else
     {
@@ -536,6 +544,8 @@ end:
 
     if (archive != 0)
         FSUSER_CloseArchive(archive);
+
+    Draw_Unlock();
 }
 
 #undef TRY
