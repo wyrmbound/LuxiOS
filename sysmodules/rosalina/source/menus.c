@@ -43,6 +43,7 @@
 #include "fmt.h"
 #include "process_patches.h"
 #include "luma_config.h"
+#include "pmdbgext.h"
 
 Menu rosalinaMenu = {
     "LuxiOS menu",
@@ -340,13 +341,21 @@ void RosalinaMenu_TakeScreenshot(void)
     IFile file = {0};
     Result res = 0;
 
-    char filename[64];
+    char filename[128];
     char dateTimeStr[32];
+    char dirPath[48] = "/luma/screenshots";
 
     FS_Archive archive;
     FS_ArchiveID archiveId;
     s64 out;
     bool isSdMode;
+
+    // Group screenshots in a folder per title, like /luma/titles (upstream LumaTeam/Luma3DS#1627)
+    FS_ProgramInfo progInfo;
+    u32 pid, launchFlags;
+    bool perTitleDir = R_SUCCEEDED(PMDBG_GetCurrentAppInfo(&progInfo, &pid, &launchFlags));
+    if (perTitleDir)
+        sprintf(dirPath, "/luma/screenshots/%016llX", progInfo.programId);
 
     timeSpentConvertingScreenshot = 0;
     timeSpentWritingScreenshot = 0;
@@ -373,6 +382,12 @@ void RosalinaMenu_TakeScreenshot(void)
         res = FSUSER_CreateDirectory(archive, fsMakePath(PATH_ASCII, "/luma/screenshots"), 0);
         if((u32)res == 0xC82044BE) // directory already exists
             res = 0;
+        if(R_SUCCEEDED(res) && perTitleDir)
+        {
+            res = FSUSER_CreateDirectory(archive, fsMakePath(PATH_ASCII, dirPath), 0);
+            if((u32)res == 0xC82044BE)
+                res = 0;
+        }
         FSUSER_CloseArchive(archive);
     }
     else
@@ -383,19 +398,19 @@ void RosalinaMenu_TakeScreenshot(void)
 
     dateTimeToString(dateTimeStr, osGetTime(), true);
 
-    sprintf(filename, "/luma/screenshots/%s_top.bmp", dateTimeStr);
+    snprintf(filename, sizeof(filename), "%s/%s_top.bmp", dirPath, dateTimeStr);
     TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));
     TRY(RosalinaMenu_WriteScreenshot(&file, topWidth, true, true));
     TRY(IFile_Close(&file));
 
-    sprintf(filename, "/luma/screenshots/%s_bot.bmp", dateTimeStr);
+    snprintf(filename, sizeof(filename), "%s/%s_bot.bmp", dirPath, dateTimeStr);
     TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));
     TRY(RosalinaMenu_WriteScreenshot(&file, bottomWidth, false, true));
     TRY(IFile_Close(&file));
 
     if(is3d && (Draw_GetCurrentFramebufferAddress(true, true) != Draw_GetCurrentFramebufferAddress(true, false)))
     {
-        sprintf(filename, "/luma/screenshots/%s_top_right.bmp", dateTimeStr);
+        snprintf(filename, sizeof(filename), "%s/%s_top_right.bmp", dirPath, dateTimeStr);
         TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));
         TRY(RosalinaMenu_WriteScreenshot(&file, topWidth, true, false));
         TRY(IFile_Close(&file));
@@ -428,6 +443,7 @@ end:
             posY = Draw_DrawString(10, posY, COLOR_WHITE, "Operation succeeded.\n\n");
             posY = Draw_DrawFormattedString(10, posY, COLOR_WHITE, "Time spent converting:    %5lums\n", t1);
             posY = Draw_DrawFormattedString(10, posY, COLOR_WHITE, "Time spent writing files: %5lums\n", t2);
+            posY = Draw_DrawFormattedString(10, posY + SPACING_Y, COLOR_WHITE, "Saved to %s/", dirPath);
         }
 
         Draw_FlushFramebuffer();
