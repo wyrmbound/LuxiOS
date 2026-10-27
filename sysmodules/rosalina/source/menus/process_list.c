@@ -666,6 +666,57 @@ static inline void ProcessListMenu_HandleSelected(const ProcessInfo *info)
     GDB_UnlockAllContexts(&gdbServer);
 }
 
+// Asks for confirmation, then terminates an application (game or homebrew) through PM, which also tells
+// HOME Menu it exited. For apps that hang and no longer respond to HOME (upstream request #2134).
+// System processes are refused: killing them would crash the console.
+static void ProcessListMenu_TerminateSelected(const ProcessInfo *info)
+{
+    u32 tidHigh = (u32)(info->titleId >> 32);
+    bool isApplication = tidHigh == 0x00040000 || tidHigh == 0x00040002; // application or demo
+    bool done = false;
+    Result res = 0;
+
+    Draw_Lock();
+    Draw_ClearFramebuffer();
+    Draw_FlushFramebuffer();
+    Draw_Unlock();
+
+    do
+    {
+        Draw_Lock();
+        Draw_DrawString(10, 10, COLOR_TITLE, "Terminate process");
+        if(!isApplication)
+            Draw_DrawFormattedString(10, 30, COLOR_WHITE, "%.8s is not a game or homebrew app.\nSystem processes can't be terminated.\n\nPress B to go back.", info->name);
+        else if(!done)
+            Draw_DrawFormattedString(10, 30, COLOR_WHITE, "Terminate %.8s (PID %lu)?\nUnsaved progress will be lost.\n\nPress X to confirm.\nPress B to go back.", info->name, info->pid);
+        else if(R_SUCCEEDED(res))
+            Draw_DrawString(10, 30, COLOR_WHITE, "Terminating. Close the menu to\nreturn to HOME Menu.\n\nPress B to go back.");
+        else
+            Draw_DrawFormattedString(10, 30, COLOR_WHITE, "Failed (0x%08lx).\n\nPress B to go back.", res);
+        Draw_FlushFramebuffer();
+        Draw_Unlock();
+
+        u32 pressed = waitInputWithTimeout(1000);
+        if(pressed & KEY_B)
+            break;
+        else if(isApplication && !done && (pressed & KEY_X))
+        {
+            // 1 s grace period: an app that still works can exit cleanly once the menu is closed
+            res = PMAPP_TerminateProcess(info->pid, 1000 * 1000 * 1000LL);
+            done = true;
+            Draw_Lock();
+            Draw_ClearFramebuffer();
+            Draw_Unlock();
+        }
+    }
+    while(!menuShouldExit);
+
+    Draw_Lock();
+    Draw_ClearFramebuffer();
+    Draw_FlushFramebuffer();
+    Draw_Unlock();
+}
+
 s32 ProcessListMenu_FetchInfo(void)
 {
     u32 pidList[0x40];
@@ -673,15 +724,19 @@ s32 ProcessListMenu_FetchInfo(void)
 
     svcGetProcessList(&processAmount, pidList, 0x40);
 
-    for(s32 i = 0; i < processAmount; i++)
+    // Processes that exited since svcGetProcessList are skipped; compact the list so no stale entry is left behind
+    s32 n = 0;
+    for(s32 j = 0; j < processAmount; j++)
     {
         Handle processHandle = 0;
         s64 creationTimeTicks = 0;
-        Result res = svcOpenProcess(&processHandle, pidList[i]);
+        Result res = svcOpenProcess(&processHandle, pidList[j]);
         if(R_FAILED(res))
             continue;
 
-        infos[i].pid = pidList[i];
+        s32 i = n++;
+
+        infos[i].pid = pidList[j];
         svcGetProcessInfo((s64 *)&infos[i].name, processHandle, 0x10000);
         svcGetProcessInfo((s64 *)&infos[i].titleId, processHandle, 0x10001);
         infos[i].isZombie = svcWaitSynchronization(processHandle, 0) == 0;
@@ -690,7 +745,9 @@ s32 ProcessListMenu_FetchInfo(void)
         svcCloseHandle(processHandle);
     }
 
-    return processAmount;
+    // Clear the leftover tail so comparisons with the previous list stay meaningful
+    memset(&infos[n], 0, (sizeof(infos) / sizeof(infos[0]) - n) * sizeof(infos[0]));
+    return n;
 }
 
 void RosalinaMenu_ProcessList(void)
@@ -750,6 +807,11 @@ void RosalinaMenu_ProcessList(void)
             break;
         else if(pressed & KEY_A)
             ProcessListMenu_HandleSelected(&infos[selected]);
+        else if(pressed & KEY_X)
+        {
+            ProcessListMenu_TerminateSelected(&infos[selected]);
+            processAmount = ProcessListMenu_FetchInfo(); // the terminate screen cleared the framebuffer, so the list redraws fully
+        }
         else if(pressed & KEY_DOWN)
             selected++;
         else if(pressed & KEY_UP)
