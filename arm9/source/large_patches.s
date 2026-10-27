@@ -265,9 +265,10 @@ readFileSHA256Vtab11Patch: //Result Write(this, u32 off, u8 *data, u32 size)
     ldr r4, readFileSHA256Vtab11PatchProcessPtr
     blx r4
 
-    @ Drop the size slot, proc and the saved r0 (this) so ProcessBytes' Result stays in r0
-    add sp, #0x1c
-    pop {r1-r4, pc}
+    @ LuxiOS: this returns `this` (non-negative = success) like the hardware-tested PR, not ProcessBytes' result:
+    @ that function's return type isn't confirmed. Revisit once tested on hardware
+    add sp, #0x18
+    pop {r0-r4, pc}
 
 .global readFileSHA256Vtab11PatchCtorPtr 
 .global readFileSHA256Vtab11PatchInitPtr

@@ -210,3 +210,6 @@ SECTIONS
     .debug_loc      0 : { *(.debug_loc) }
     .debug_macinfo  0 : { *(.debug_macinfo) }
 }
+
+/* LuxiOS: ITCM-loaded code/data (e.g. the ReadFileSHA256 patch) must stay below the ITCM stack */
+ASSERT(__itcm_end__ <= __itcm_stack_bottom__, "ITCM sections overlap the ITCM stack");
