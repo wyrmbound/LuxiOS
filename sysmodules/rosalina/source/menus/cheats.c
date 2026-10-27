@@ -123,15 +123,40 @@ static u32 Cheat_GetRandomNumber(void)
     return (u32)(cheatRngState >> 32);
 }
 
-static bool Cheat_IsValidAddress(const Handle processHandle, u32 address, u32 size)
+// Last failed memory access, shown in the cheat list next to an invalid (red) cheat. Without it a failing
+// cheat only turns red, which makes reports like upstream #2163 (offset codes) impossible to diagnose
+static struct
 {
-    MemInfo info;
+    u32 addr;
+    Result res;
+    u32 state, perms;
+    bool write, set;
+} cheatLastFailure;
+
+static u32 cheatLastQueryState, cheatLastQueryPerms;
+
+static void Cheat_RecordFailure(u32 addr, bool write, Result res)
+{
+    cheatLastFailure.addr = addr;
+    cheatLastFailure.res = res;
+    cheatLastFailure.state = cheatLastQueryState;
+    cheatLastFailure.perms = cheatLastQueryPerms;
+    cheatLastFailure.write = write;
+    cheatLastFailure.set = true;
+}
+
+static bool Cheat_IsValidAddress(const Handle processHandle, u32 address, u32 size, bool write)
+{
+    MemInfo info = { 0 };
     PageInfo out;
 
     Result res = svcQueryDebugProcessMemory(&info, &out, processHandle, address);
+    cheatLastQueryState = info.state;
+    cheatLastQueryPerms = info.perm;
     if (R_SUCCEEDED(res) && info.state != MEMSTATE_FREE && info.base_addr > 0 && info.base_addr <= address && address <= info.base_addr + info.size - size) {
         return true;
     }
+    Cheat_RecordFailure(address, write, res);
     return false;
 }
 
@@ -147,10 +172,13 @@ static bool Cheat_Write8(const Handle processHandle, u32 offset, u8 value)
         cheatPage[addr - 0x01E81000] = value;
         return true;
     }
-    if (Cheat_IsValidAddress(processHandle, addr, 1))
+    if (Cheat_IsValidAddress(processHandle, addr, 1, true))
     {
         *((u8*) (&ReadWriteBuffer8)) = value;
-        return R_SUCCEEDED(svcWriteProcessMemory(processHandle, &ReadWriteBuffer8, addr, 1));
+        Result res = svcWriteProcessMemory(processHandle, &ReadWriteBuffer8, addr, 1);
+        if (R_FAILED(res))
+            Cheat_RecordFailure(addr, true, res);
+        return R_SUCCEEDED(res);
     }
     return false;
 }
@@ -163,10 +191,13 @@ static bool Cheat_Write16(const Handle processHandle, u32 offset, u16 value)
         *(u16*)(cheatPage + addr - 0x01E81000) = value;
         return true;
     }
-    if (Cheat_IsValidAddress(processHandle, addr, 2))
+    if (Cheat_IsValidAddress(processHandle, addr, 2, true))
     {
         *((u16*) (&ReadWriteBuffer16)) = value;
-        return R_SUCCEEDED(svcWriteProcessMemory(processHandle, &ReadWriteBuffer16, addr, 2));
+        Result res = svcWriteProcessMemory(processHandle, &ReadWriteBuffer16, addr, 2);
+        if (R_FAILED(res))
+            Cheat_RecordFailure(addr, true, res);
+        return R_SUCCEEDED(res);
     }
     return false;
 }
@@ -179,10 +210,13 @@ static bool Cheat_Write32(const Handle processHandle, u32 offset, u32 value)
         *(u32*)(cheatPage + addr - 0x01E81000) = value;
         return true;
     }
-    if (Cheat_IsValidAddress(processHandle, addr, 4))
+    if (Cheat_IsValidAddress(processHandle, addr, 4, true))
     {
         *((u32*) (&ReadWriteBuffer32)) = value;
-        return R_SUCCEEDED(svcWriteProcessMemory(processHandle, &ReadWriteBuffer32, addr, 4));
+        Result res = svcWriteProcessMemory(processHandle, &ReadWriteBuffer32, addr, 4);
+        if (R_FAILED(res))
+            Cheat_RecordFailure(addr, true, res);
+        return R_SUCCEEDED(res);
     }
     return false;
 }
@@ -195,9 +229,11 @@ static bool Cheat_Read8(const Handle processHandle, u32 offset, u8* retValue)
         *retValue = cheatPage[addr - 0x01E81000];
         return true;
     }
-    if (Cheat_IsValidAddress(processHandle, addr, 1))
+    if (Cheat_IsValidAddress(processHandle, addr, 1, false))
     {
         Result res = svcReadProcessMemory(&ReadWriteBuffer8, processHandle, addr, 1);
+        if (R_FAILED(res))
+            Cheat_RecordFailure(addr, false, res);
         *retValue = *((u8*) (&ReadWriteBuffer8));
         return R_SUCCEEDED(res);
     }
@@ -212,9 +248,11 @@ static bool Cheat_Read16(const Handle processHandle, u32 offset, u16* retValue)
         *retValue = *(u16*)(cheatPage + addr - 0x01E81000);
         return true;
     }
-    if (Cheat_IsValidAddress(processHandle, addr, 2))
+    if (Cheat_IsValidAddress(processHandle, addr, 2, false))
     {
         Result res = svcReadProcessMemory(&ReadWriteBuffer16, processHandle, addr, 2);
+        if (R_FAILED(res))
+            Cheat_RecordFailure(addr, false, res);
         *retValue = *((u16*) (&ReadWriteBuffer16));
         return R_SUCCEEDED(res);
     }
@@ -229,9 +267,11 @@ static bool Cheat_Read32(const Handle processHandle, u32 offset, u32* retValue)
         *retValue = *(u32*)(cheatPage + addr - 0x01E81000);
         return true;
     }
-    if (Cheat_IsValidAddress(processHandle, addr, 4))
+    if (Cheat_IsValidAddress(processHandle, addr, 4, false))
     {
         Result res = svcReadProcessMemory(&ReadWriteBuffer32, processHandle, addr, 4);
+        if (R_FAILED(res))
+            Cheat_RecordFailure(addr, false, res);
         *retValue = *((u32*) (&ReadWriteBuffer32));
         return R_SUCCEEDED(res);
     }
@@ -2127,6 +2167,13 @@ void RosalinaMenu_Cheats(void)
                     Draw_DrawString(30, 30 + i * SPACING_Y, cheats[j]->valid ? COLOR_WHITE : COLOR_RED, buf);
                     Draw_DrawCharacter(10, 30 + i * SPACING_Y, COLOR_TITLE, j == selected ? '>' : ' ');
                 }
+
+                // Why the selected (red) cheat failed: access, address, result, memory state and permissions
+                if (selected < cheatCount && !cheats[selected]->valid && cheatLastFailure.set)
+                    Draw_DrawFormattedString(100, 10, COLOR_RED, "%c %08lx %08lx s%02lx p%lx ", cheatLastFailure.write ? 'W' : 'R',
+                        cheatLastFailure.addr, (u32)cheatLastFailure.res, cheatLastFailure.state & 0xFF, cheatLastFailure.perms);
+                else
+                    Draw_DrawString(100, 10, COLOR_WHITE, "                             ");
             }
             else
             {
