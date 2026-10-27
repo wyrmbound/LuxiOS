@@ -160,8 +160,8 @@ static int parseDecFloatOption(s64 *out, const char *val, s64 minval, s64 maxval
             break;
     }
 
-    // Reject "-" and "+"
-    if (val[0] == '\0') {
+    // Reject "-", "+" and a second sign ("--1")
+    if (val[0] == '\0' || val[0] == '+' || val[0] == '-') {
         return -1;
     }
 
@@ -185,7 +185,9 @@ static int parseDecFloatOption(s64 *out, const char *val, s64 minval, s64 maxval
         return -1;
     }
 
-    s64 intPartAbs = sign == -1 ? -intPart : intPart;
+    // The sign was already stripped above and is applied once at the end: negating here too
+    // turned "-1.5" into +0.5
+    s64 intPartAbs = intPart;
     s64 res = 0;
     bool of = __builtin_mul_overflow(intPartAbs, FLOAT_CONV_MULT, &res);
 
@@ -1137,7 +1139,7 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
             {
                 u32 singleOldSelected = oldSelectedOption - multiOptionsAmount;
                 drawString(true, 10, singleOptions[singleOldSelected].posY, COLOR_WHITE, singleOptionsText[singleOldSelected]);
-                if(singleOptions[singleOldSelected].enabled) drawCharacter(true, 10 + SPACING_X, singleOptions[singleOldSelected].posY, COLOR_WHITE, selected);
+                if(singleOptions[singleOldSelected].enabled && singleOptionsText[singleOldSelected][0] == '(') drawCharacter(true, 10 + SPACING_X, singleOptions[singleOldSelected].posY, COLOR_WHITE, selected);
             }
 
             if(isMultiOption) drawString(true, 10, multiOptions[selectedOption].posY, COLOR_RED, multiOptionsText[selectedOption]);
@@ -1185,7 +1187,8 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
     }
 
     //Parse and write the new configuration
-    configData.multiConfig = 0;
+    // Only clear the options shown in the menu, so hidden ones (e.g. force_audio_output) survive a save
+    configData.multiConfig &= ~((1u << (2 * multiOptionsAmount)) - 1);
     for(u32 i = 0; i < multiOptionsAmount; i++)
         configData.multiConfig |= multiOptions[i].enabled << (i * 2);
 
