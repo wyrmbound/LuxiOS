@@ -32,6 +32,10 @@
 - **Time zones:** offsets like UTC−03:30 were shown as −04:30, and choosing "−03:30" applied −02:30.
 - **Screen filters:** *Invert* also inverted color temperature, contrast and gamma (invert + warm gave plain white instead of warm white).
 - **Plugins:** plugin memory could contain leftover data from other programs (only a quarter of each block was cleared).
+- **Memory dumps of big games** (Process list → dump) crashed; they're now written in pieces with a progress counter (upstream [#1398](https://github.com/LumaTeam/Luma3DS/issues/1398)).
+- **Region emulation broke system-version checks** (e.g. NetPass): apps looked for the version file of the *emulated* region, which doesn't exist. Those lookups now go to your console's real region (upstream [#2141](https://github.com/LumaTeam/Luma3DS/issues/2141)).
+- **Game cards with the NoCrypto flag** failed to load. Includes the community fix from upstream PR [#1829](https://github.com/LumaTeam/Luma3DS/pull/1829), hardened so that if it doesn't recognize your system's code it simply skips itself instead of stopping the boot (upstream [#1827](https://github.com/LumaTeam/Luma3DS/issues/1827)).
+- **Card slot power menu** showed "DISABLED" for any error and ignored failed toggles. It now shows whether a card is detected, the real error code, and toggle failures, so a dirty slot isn't mistaken for a stuck setting (upstream [#2227](https://github.com/LumaTeam/Luma3DS/issues/2227)).
 - **Shutdown:** Rosalina's service loop could spin forever during cleanup if an unsubscribe failed.
 - **Network time (NTP):** no longer freezes the console if the time server's reply is lost (likely upstream #2195); the synced clock is no longer up to 1 s fast; times after 2036 are handled.
 - **Community fixes merged from open upstream pull requests:** Local Play and StreetPass work again after Rosalina's networking was used ([#2262](https://github.com/LumaTeam/Luma3DS/pull/2262)), and opening the menu no longer freezes some games while the GPU is busy ([#2232](https://github.com/LumaTeam/Luma3DS/pull/2232), with a time limit added to its wait loop).
