@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -116,15 +117,16 @@ int dateTimeToString(char *out, u64 msSince1900, bool filenameFormat)
     // Conversion code adapted from https://stackoverflow.com/questions/21593692/convert-unix-timestamp-to-date-without-system-libs
     // (original author @gnif under CC-BY-SA 4.0)
     u32 seconds, minutes, hours, days, year, month;
-    u64 milliseconds = msSince1900;
-    seconds = milliseconds/1000;
-    milliseconds %= 1000;
-    minutes = seconds / 60;
-    seconds %= 60;
-    hours = minutes / 60;
-    minutes %= 60;
-    days = hours / 24;
-    hours %= 24;
+    u64 milliseconds = msSince1900 % 1000;
+
+    // Seconds since 1900 no longer fit in 32 bits after 2036-02-07, so divide down in 64 bits
+    u64 totalSeconds = msSince1900 / 1000;
+    seconds = totalSeconds % 60;
+    u64 totalMinutes = totalSeconds / 60;
+    minutes = totalMinutes % 60;
+    u64 totalHours = totalMinutes / 60;
+    hours = totalHours % 24;
+    days = (u32)(totalHours / 24);
 
     year = 1900; // osGetTime starts in 1900
 

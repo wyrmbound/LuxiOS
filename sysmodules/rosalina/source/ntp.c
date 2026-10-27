@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2021 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -38,6 +39,8 @@
 #define MSEC_DELTA_1900_2000 3155673600000ull
 
 #define MAKE_IPV4(a,b,c,d)  ((a) << 24 | (b) << 16 | (c) << 8 | (d))
+
+#define NTP_TIMEOUT_MS      3000
 
 #ifndef NTP_IP
 #define NTP_IP              MAKE_IPV4(51, 137, 137, 111) // time.windows.com
@@ -89,6 +92,7 @@ Result ntpGetTimeStamp(u64 *msSince1900, u64 *samplingTick)
     int sock = socSocket(AF_INET, SOCK_DGRAM, 0);
     if (sock < -10000) {
         // Socket services broken
+        miniSocExit();
         return sock;
     }
 
@@ -117,6 +121,11 @@ Result ntpGetTimeStamp(u64 *msSince1900, u64 *samplingTick)
     if(socSend(sock, &packet, sizeof(NtpPacket), 0) < 0)
         goto cleanup;
 
+    // UDP replies can get lost: wait at most NTP_TIMEOUT_MS instead of blocking (and freezing the menu) forever
+    struct pollfd pfd = { .fd = sock, .events = POLLIN };
+    if(socPoll(&pfd, 1, NTP_TIMEOUT_MS) <= 0 || !(pfd.revents & POLLIN))
+        goto cleanup;
+
     if(socRecv(sock, &packet, sizeof(NtpPacket), 0) < 0)
         goto cleanup;
     roundTripTicks = svcGetSystemTick() - roundTripTicks;
@@ -130,7 +139,13 @@ Result ntpGetTimeStamp(u64 *msSince1900, u64 *samplingTick)
     packet.txTm_s = ntohl(packet.txTm_s); // Time-stamp seconds.
     packet.txTm_f = ntohl(packet.txTm_f); // Time-stamp fraction of a second. txTm is 32.32 fixed point.
     u64 txTmUsec = (1000 * 1000 * (u64)packet.txTm_f) >> 32; // convert txTm to usec (truncate; end result is in ms anyway)
-    txTmUsec += 1000 * 1000 * (u64)packet.txTm_s;
+
+    // NTP seconds wrap every 2^32 s (era 1 starts 2036-02-07). RFC 4330 sec. 3: if the MSB is clear,
+    // the timestamp is in era 1. This maps 1968..2104 correctly.
+    u64 txSec = packet.txTm_s;
+    if (!(txSec & 0x80000000u))
+        txSec += 1ull << 32;
+    txTmUsec += 1000 * 1000 * txSec;
     *msSince1900 = (txTmUsec + dt + 500u) / 1000u;
     *samplingTick = svcGetSystemTick();
 
@@ -182,7 +197,7 @@ static Result ntpSetTimeDateImpl(u64 msSince1900, u64 samplingTick, bool syncRtc
         if (msY2k % 1000u != 0)
         {
             u64 dt2 = 1000u - msY2k % 1000u;
-            svcSleepThread(dt2);
+            svcSleepThread(dt2 * 1000 * 1000); // ms -> ns
             msY2k += dt2;
         }
         if (R_SUCCEEDED(res)) res = PTMSYSM_SetRtcTime(msY2k);
