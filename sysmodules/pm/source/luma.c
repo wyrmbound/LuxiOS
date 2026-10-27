@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 #include <3ds.h>
 #include <string.h>
 #include <assert.h>
@@ -136,22 +137,32 @@ void injectLumaReservedFirmlaunchParams(void *params)
     memcpy(&p.magic, "LUMA", 4);
     p.version = 1;
 
-    assertSuccess(cfguInit()); // get cfg:s or cfg:i
+    // Best effort: this runs on every firmlaunch (DS/GBA games, System Settings...) and the data is optional,
+    // so a missing or unreadable CFG block (e.g. QTM blocks on a model without them) must not panic pm.
+    // Without it, the block is simply absent (no LUMA magic)
+    memset((u8 *)params + 0x540, 0, sizeof(p)); // no stale block from an earlier firmlaunch if we bail out
+    if (R_FAILED(cfguInit())) // get cfg:s or cfg:i
+        return;
+
+    bool ok = true;
 
     // Get slider calibration from CFG
-    assertSuccess(CFG_GetConfigInfoBlk8(sizeof(p.data.slidersCal), 0x00120000, &p.data.slidersCal));
-    assertSuccess(CFG_GetConfigInfoBlk8(sizeof(p.data.stereoDisplayCal), 0x00050005, &p.data.stereoDisplayCal));
+    ok = ok && R_SUCCEEDED(CFG_GetConfigInfoBlk8(sizeof(p.data.slidersCal), 0x00120000, &p.data.slidersCal));
+    ok = ok && R_SUCCEEDED(CFG_GetConfigInfoBlk8(sizeof(p.data.stereoDisplayCal), 0x00050005, &p.data.stereoDisplayCal));
 
     // Get QTM status and calibration from CFG
     if (IS_N3DS) {
-        assertSuccess(CFG_GetConfigInfoBlk8(sizeof(p.data.qtmStatusCfg), 0x00180000, &p.data.qtmStatusCfg));
-        assertSuccess(CFG_GetConfigInfoBlk8(sizeof(p.data.qtmCal), 0x00180001, &p.data.qtmCal));
+        ok = ok && R_SUCCEEDED(CFG_GetConfigInfoBlk8(sizeof(p.data.qtmStatusCfg), 0x00180000, &p.data.qtmStatusCfg));
+        ok = ok && R_SUCCEEDED(CFG_GetConfigInfoBlk8(sizeof(p.data.qtmCal), 0x00180001, &p.data.qtmCal));
     }
 
-    assertSuccess(CFG_GetConfigInfoBlk8(sizeof(p.data.gyroCal), 0x00040002, &p.data.gyroCal));
-    assertSuccess(CFG_GetConfigInfoBlk8(sizeof(p.data.accelCal), 0x00040003, &p.data.accelCal));
+    ok = ok && R_SUCCEEDED(CFG_GetConfigInfoBlk8(sizeof(p.data.gyroCal), 0x00040002, &p.data.gyroCal));
+    ok = ok && R_SUCCEEDED(CFG_GetConfigInfoBlk8(sizeof(p.data.accelCal), 0x00040003, &p.data.accelCal));
 
     cfguExit();
+
+    if (!ok)
+        return;
 
     p.crc = crc32(&p.data, sizeof(p.data), 0xFFFFFFFF);
 

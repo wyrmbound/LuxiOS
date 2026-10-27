@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 #include <3ds.h>
 #include <string.h>
 #include "launch.h"
@@ -114,6 +115,7 @@ void pmAppHandleCommands(void *ctx)
             memcpy(&programInfo, cmdbuf + 1, sizeof(FS_ProgramInfo));
             memcpy(&programInfoUpdate, cmdbuf + 5, sizeof(FS_ProgramInfo));
             cmdbuf[1] = LaunchTitleUpdate(&programInfo, &programInfoUpdate, cmdbuf[9]);
+            cmdbuf[0] = IPC_MakeHeader(13, 1, 0); // reply header was missing (request header was sent back)
             break;
         default:
             cmdbuf[0] = IPC_MakeHeader(0, 1, 0);
