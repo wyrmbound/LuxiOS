@@ -1,5 +1,6 @@
 /*
 *   This file is part of Luma3DS
+*   Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
@@ -37,5 +38,5 @@ extern int inputRedirectionStartResult;
 MyThread *inputRedirectionCreateThread(void);
 void inputRedirectionThreadMain(void);
 Result InputRedirection_Disable(s64 timeout);
-Result InputRedirection_DoOrUndoPatches(void);
+Result InputRedirection_DoOrUndoPatches(bool enable);
 

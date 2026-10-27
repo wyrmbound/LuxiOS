@@ -701,7 +701,10 @@ void menuShow(Menu *root)
         }
         else if(pressed & KEY_B)
         {
-            while (nbPreviousMenus == 0 && (scanHeldKeys() & KEY_B)); // wait a bit before exiting rosalina
+            // Wait a bit before exiting rosalina. Bounded and sleeping: with InputRedirection, a lost "B released"
+            // packet used to keep this spinning forever with the game frozen (upstream #1852)
+            for (u32 i = 0; i < 500 && nbPreviousMenus == 0 && !menuShouldExit && (scanHeldKeys() & KEY_B); i++)
+                svcSleepThread(1 * 1000 * 1000LL);
 
             Draw_Lock();
             Draw_ClearFramebuffer();

@@ -263,7 +263,7 @@ void MiscellaneousMenu_InputRedirection(void)
             Draw_DrawString(10, 30, COLOR_WHITE, "Starting InputRedirection...");
             if(!done)
             {
-                res = InputRedirection_DoOrUndoPatches();
+                res = InputRedirection_DoOrUndoPatches(true);
                 if(R_SUCCEEDED(res))
                 {
                     res = svcCreateEvent(&inputRedirectionThreadStartedEvent, RESET_STICKY);
@@ -277,7 +277,7 @@ void MiscellaneousMenu_InputRedirection(void)
                         if(res != 0)
                         {
                             svcCloseHandle(inputRedirectionThreadStartedEvent);
-                            InputRedirection_DoOrUndoPatches();
+                            InputRedirection_DoOrUndoPatches(false);
                             inputRedirectionEnabled = false;
                         }
                         inputRedirectionStartResult = 0;

@@ -56,6 +56,18 @@ static u32 irData[] = { 0x80800081 }; // Default: C-Stick at the center, no butt
 
 int inputRedirectionStartResult;
 
+// Back to "nothing pressed" for the remote side. The hooks replace the whole local pad value as soon as the
+// remote one isn't neutral, so a client that disconnected while holding a button locked out local input,
+// even after Stop/Start (upstream #2071, #1431). Written through the PA alias like the network thread does
+static void InputRedirection_ResetRemoteState(void)
+{
+    u32 *hidDataPhys = PA_FROM_VA_PTR(hidData);
+    hidDataPhys[5] = 0x00000FFF;
+    hidDataPhys[6] = 0x02000000;
+    hidDataPhys[7] = 0x007FF7FF;
+    *(u32 *)PA_FROM_VA_PTR(irData) = 0x80800081;
+}
+
 void inputRedirectionThreadMain(void)
 {
     Result res = 0;
@@ -107,6 +119,7 @@ void inputRedirectionThreadMain(void)
         return;
     }
 
+    InputRedirection_ResetRemoteState();
     inputRedirectionEnabled = true;
     svcSignalEvent(inputRedirectionThreadStartedEvent);
 
@@ -140,6 +153,13 @@ void inputRedirectionThreadMain(void)
             else if(n < 12)
                 continue;
 
+            // All-zero pad/touch/circle means "every button pressed" (active low): not a real input, and it
+            // would open the menu nonstop (menu combo) from a bad or third-party client
+            u32 words[3];
+            memcpy(words, buf, 12);
+            if(words[0] == 0 && words[1] == 0 && words[2] == 0)
+                continue;
+
             memcpy(hidDataPhys, buf, 12);
             if(n >= 20)
             {
@@ -147,6 +167,7 @@ void inputRedirectionThreadMain(void)
 
                 oldSpecialButtons = specialButtons;
                 memcpy(&specialButtons, buf + 16, 4);
+                specialButtons &= 7; // HOME, POWER, POWER held long
 
                 if(!(oldSpecialButtons & 1) && (specialButtons & 1)) // HOME button pressed
                     srvPublishToSubscriber(0x204, 0);
@@ -162,7 +183,14 @@ void inputRedirectionThreadMain(void)
         }
         else if(pollres < -10000)
             break;
+        else if(pollres < 0 || (pollres > 0 && (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))))
+            svcSleepThread(100 * 1000 * 1000LL); // transient error: don't busy-loop at high priority
     }
+
+    // Don't leave the last remote input applied, and release HOME if it was held when the client stopped
+    InputRedirection_ResetRemoteState();
+    if(specialButtons & 1)
+        srvPublishToSubscriber(0x205, 0);
 
     inputRedirectionEnabled = false;
     struct linger linger;
@@ -420,11 +448,11 @@ static Result InputRedirection_DoUndoHidPatches(Handle processHandle, bool doPat
 
 Result InputRedirection_Disable(s64 timeout)
 {
-    if(!inputRedirectionEnabled)
-        return 0;
+    bool wasRunning = inputRedirectionEnabled;
 
-    Result res = InputRedirection_DoOrUndoPatches();
-    if(R_FAILED(res))
+    // Always undo the patches: the thread may have stopped by itself (network error) and left them applied
+    Result res = InputRedirection_DoOrUndoPatches(false);
+    if(R_FAILED(res) || !wasRunning)
         return res;
 
     inputRedirectionEnabled = false;
@@ -434,7 +462,9 @@ Result InputRedirection_Disable(s64 timeout)
     return res;
 }
 
-Result InputRedirection_DoOrUndoPatches(void)
+// Brings the hid/ir patches to the requested state (no-op for parts already there). It used to toggle, so
+// patch state and thread state could get out of sync and Start/Stop would invert (upstream #1431)
+Result InputRedirection_DoOrUndoPatches(bool enable)
 {
     static bool hidPatched = false;
     static bool irPatched = false;
@@ -455,17 +485,23 @@ Result InputRedirection_DoOrUndoPatches(void)
 
     if(R_SUCCEEDED(res))
     {
-        res = InputRedirection_DoUndoHidPatches(hidProcHandle, !hidPatched);
-        if (R_SUCCEEDED(res))
-            hidPatched = !hidPatched;
+        if (hidPatched != enable)
+        {
+            res = InputRedirection_DoUndoHidPatches(hidProcHandle, enable);
+            if (R_SUCCEEDED(res))
+                hidPatched = enable;
+        }
     }
 
     if(R_SUCCEEDED(res) && GET_VERSION_MINOR(osGetKernelVersion()) >= 44)
     {
-        res = InputRedirection_DoUndoIrPatches(irProcHandle, !irPatched);
-        if (R_SUCCEEDED(res))
-            irPatched = !irPatched;
-        else if (!irPatched)
+        if (irPatched != enable)
+        {
+            res = InputRedirection_DoUndoIrPatches(irProcHandle, enable);
+            if (R_SUCCEEDED(res))
+                irPatched = enable;
+        }
+        if (R_FAILED(res) && enable && !irPatched)
         {
             InputRedirection_DoUndoHidPatches(hidProcHandle, false);
             hidPatched = false;
