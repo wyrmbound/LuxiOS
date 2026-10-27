@@ -52,6 +52,7 @@ void        PluginLoader__Init(void)
         if (R_SUCCEEDED(IFile_Read(&file, &temp_read, &magic, sizeof(magic))) && temp_read == sizeof(magic) && magic == PERS_USER_FILE_MAGIC
             && R_SUCCEEDED(IFile_Read(&file, &temp_read, params, sizeof(PluginLoadParameters))) && temp_read == sizeof(PluginLoadParameters))
         {
+            params->path[sizeof(params->path) - 1] = '\0'; // The file may not terminate it
             ctx->useUserLoadParameters = true;
         }
         else

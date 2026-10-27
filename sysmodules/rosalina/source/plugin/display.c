@@ -1,6 +1,7 @@
 #include <3ds.h>
 #include "menu.h"
 #include "draw.h"
+#include "plugin.h"
 #include <stdio.h>
 
 static const char *__press_b_to_close = "Press [B] to close";
@@ -73,6 +74,10 @@ void    DisplayPluginMenu(u32   *cmdbuf)
     const string    *items = (const string *)cmdbuf[7];
     const string    *hints = (const string *)cmdbuf[9];
 
+    // An empty menu would let the cursor wrap to 0xFFFFFFFF and index states/hints out of bounds
+    if (nbItems == 0 || nbItems > MAX_ITEMS_COUNT)
+        return;
+
     menuEnter();
     Draw_Lock();
 
@@ -94,7 +99,7 @@ void    DisplayPluginMenu(u32   *cmdbuf)
 
             for (; i < end; ++i, posY += 10)
             {
-                sprintf(buffer, "[ ] %s", items[i]);
+                snprintf(buffer, sizeof(buffer), "[ ] %.49s", items[i]);
                 Draw_DrawString(30, posY, COLOR_WHITE, buffer);
 
                 if (i == cursor) Draw_DrawCharacter(10, posY, COLOR_TITLE, '>');
@@ -103,7 +108,10 @@ void    DisplayPluginMenu(u32   *cmdbuf)
 
             // Draw hint
             if (hints[cursor][0])
-                Draw_DrawString(10, 200, COLOR_TITLE, hints[cursor]);
+            {
+                snprintf(buffer, sizeof(buffer), "%.49s", hints[cursor]);
+                Draw_DrawString(10, 200, COLOR_TITLE, buffer);
+            }
         }
 
         // Wait for input

@@ -134,8 +134,8 @@ static Result   CheckPluginCompatibility(_3gx_Header *header, u32 processTitle)
             return 0;
     }
 
-    sprintf(errorBuf, "The plugin - %s -\nis not compatible with this game.\n" \
-                      "Contact \"%s\" for more infos.", header->infos.titleMsg, header->infos.authorMsg);
+    snprintf(errorBuf, sizeof(errorBuf), "The plugin - %.64s -\nis not compatible with this game.\n" \
+                      "Contact \"%.64s\" for more infos.", header->infos.titleMsg, header->infos.authorMsg);
     
     PluginLoaderCtx.error.message = errorBuf;
 
@@ -234,6 +234,15 @@ bool     TryToLoadPlugin(Handle process, bool isHomebrew)
     // Ensure memory block is mounted
     if (!res && R_FAILED((res = MemoryBlock__IsReady())))
         ctx->error.message = "Failed to allocate memory.";
+
+    // The header, author, title and targets are parsed in place at the end of the memblock: make sure they fit
+    if (!res) {
+        u64 headerExtra = (u64)fileHeader.infos.authorLen + fileHeader.infos.titleLen + 4 + (u64)fileHeader.targets.count * sizeof(u32);
+        if (fileSize < sizeof(_3gx_Header) || fileSize > g_memBlockSize - sizeof(PluginHeader) || headerExtra > fileSize - sizeof(_3gx_Header)) {
+            ctx->error.message = "Invalid plugin file\nCorrupted header.";
+            res = -1;
+        }
+    }
 
     // Plugins will not exceed 5MB so this is fine
     if (!res) {

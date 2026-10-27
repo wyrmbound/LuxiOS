@@ -166,6 +166,7 @@ static int GDB_MakeUtf16Path(FS_Path *outPath, const char *pathData)
 {
     size_t pathDataLen = strlen(pathData);
     if (pathDataLen % 2 == 1) return GDBHIO_EINVAL;
+    if (pathDataLen / 2 > PATH_MAX) return GDBHIO_ENAMETOOLONG;
 
     char path[PATH_MAX + 1];
     u32 count = GDB_DecodeHex(path, pathData, pathDataLen / 2);

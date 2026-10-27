@@ -39,6 +39,8 @@ Result  Read_3gx_Header(IFile *file, _3gx_Header *header)
 
     file->pos = 0;
     res = IFile_Read(file, &total, header, sizeof(_3gx_Header));
+    if (R_SUCCEEDED(res) && total != sizeof(_3gx_Header))
+        res = -1; // Truncated file: don't use a partially uninitialized header
 
     return res;
 }
