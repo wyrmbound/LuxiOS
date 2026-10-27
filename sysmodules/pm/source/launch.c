@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 #include <3ds.h>
 #include <string.h>
 #include "launch.h"
@@ -247,6 +248,8 @@ static Result launchTitleImpl(Handle *debug, ProcessData **outProcessData, const
         }
     }
 
+    bool processListLocked = false; // the TRYG failures below jump to cleanup before the lock is taken
+
     if (launchFlags & PMLAUNCHFLAG_LOAD_DEPENDENCIES) {
         TRYG(loadWithDependencies(debug, outProcessData, programHandle, programInfo, launchFlags, exheaderInfo), cleanup);
         // note: official pm doesn't terminate the process if this fails (dependency loading)...
@@ -258,6 +261,7 @@ static Result launchTitleImpl(Handle *debug, ProcessData **outProcessData, const
     }
 
     ProcessList_Lock(&g_manager.processList);
+    processListLocked = true;
     ProcessData *process = *outProcessData;
     if (launchFlags & PMLAUNCHFLAG_QUEUE_DEBUG_APPLICATION) {
         // saved field is different in official pm
@@ -286,7 +290,8 @@ static Result launchTitleImpl(Handle *debug, ProcessData **outProcessData, const
         process->flags |= (launchFlags & PMLAUNCHFLAG_NOTIFY_TERMINATION) ? PROCESSFLAG_NOTIFY_TERMINATION : 0;
     }
 
-    ProcessList_Unlock(&g_manager.processList);
+    if (processListLocked)
+        ProcessList_Unlock(&g_manager.processList);
     return res;
 }
 

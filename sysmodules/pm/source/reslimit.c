@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 #include <3ds.h>
 #include "reslimit.h"
 #include "util.h"
@@ -354,8 +355,9 @@ void setAppCpuTimeLimitAndSchedModeFromDescriptor(u64 titleId, u16 descriptor)
         static const u32 numOverrides = sizeof(g_startCpuTimeOverrides) / sizeof(g_startCpuTimeOverrides[0]);
 
         if (titleUid >= g_startCpuTimeOverrides[0].titleUid && titleUid <= g_startCpuTimeOverrides[numOverrides - 1].titleUid) {
-            u32 i = 0;
-            for (u32 i = 0; i < numOverrides && titleUid < g_startCpuTimeOverrides[i].titleUid; i++);
+            // The loop used to declare its own i (shadowing this one, so entry 0 was always used) and compared with <
+            u32 i;
+            for (i = 0; i < numOverrides && titleUid != g_startCpuTimeOverrides[i].titleUid; i++);
             if (i < numOverrides) {
                 if (g_startCpuTimeOverrides[i].value > 100 && g_startCpuTimeOverrides[i].value < 200) {
                     cpuTime = CPUTIME_MULTI_MASK | 80; // "multi", max 80%
