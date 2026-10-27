@@ -118,7 +118,7 @@ static void ProcessListMenu_DumpMemory(const char *name, void *start, u32 size)
     Draw_Unlock();
 
     u64 total;
-    IFile file;
+    IFile file = {0}; // closed at 'end' even if opening failed
     Result res;
 
     char filename[100] = {0};
@@ -145,52 +145,23 @@ static void ProcessListMenu_DumpMemory(const char *name, void *start, u32 size)
         FSUSER_CloseArchive(archive);
     }
 
-    unsigned int seconds, minutes, hours, days, year, month;
-    u64 milliseconds = osGetTime();
-    seconds = milliseconds/1000;
-    milliseconds %= 1000;
-    minutes = seconds / 60;
-    seconds %= 60;
-    hours = minutes / 60;
-    minutes %= 60;
-    days = hours / 24;
-    hours %= 24;
-
-    year = 1900;
-
-    while(true)
-    {
-        bool leapYear = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
-        unsigned int daysInYear = leapYear ? 366 : 365;
-        if (days >= daysInYear)
-        {
-            days -= daysInYear;
-            ++year;
-        }
-        else
-        {
-            const unsigned int daysInMonth[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-            for(month = 0; month < 12; ++month)
-            {
-                unsigned int dim = daysInMonth[month];
-
-                if (month == 1 && leapYear)
-                    ++dim;
-
-                if (days >= dim)
-                    days -= dim;
-                else
-                    break;
-            }
-            break;
-        }
-    }
-    days++;
-    month++;
-
-    sprintf(filename, "/luma/dumps/memory/%.8s_0x%.8lx_%.4u-%.2u-%.2uT%.2u-%.2u-%.2u.bin", name, (u32)start, year, month, days, hours, minutes, seconds);
+    char dateTimeStr[32];
+    dateTimeToString(dateTimeStr, osGetTime(), true);
+    sprintf(filename, "/luma/dumps/memory/%.8s_0x%.8lx_%s.bin", name, (u32)start, dateTimeStr);
     TRY(IFile_Open(&file, archiveId, fsMakePath(PATH_EMPTY, ""), fsMakePath(PATH_ASCII, filename), FS_OPEN_CREATE | FS_OPEN_WRITE));
-    TRY(IFile_Write(&file, &total, start, size, 0));
+    // Write in 1 MB chunks: a single FS write of the whole region (tens of MB for big games) made the kernel
+    // map it all into FS at once and crashed (upstream #1398). Also shows progress
+    for(u32 off = 0; off < size; )
+    {
+        u32 chunk = size - off > 0x100000 ? 0x100000 : size - off;
+        TRY(IFile_Write(&file, &total, (const u8 *)start + off, chunk, 0));
+        off += chunk;
+
+        Draw_Lock();
+        Draw_DrawFormattedString(10, 30 + SPACING_Y, COLOR_WHITE, "%3lu%%", (u32)((u64)off * 100 / size));
+        Draw_FlushFramebuffer();
+        Draw_Unlock();
+    }
     TRY(IFile_Close(&file));
 
 end:
