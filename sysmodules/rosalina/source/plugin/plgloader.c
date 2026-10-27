@@ -1,3 +1,4 @@
+// Modified for LuxiOS (2026). See the LuxiOS git history for the changes.
 #include <3ds.h>
 #include "ifile.h"
 #include "utils.h" // for makeARMBranch
