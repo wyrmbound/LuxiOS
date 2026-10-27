@@ -530,20 +530,40 @@ void SysConfigMenu_ToggleCardIfPower(void)
     Draw_FlushFramebuffer();
     Draw_Unlock();
 
-    bool cardIfStatus = false;
-    bool updatedCardIfStatus = false;
+    // Upstream #2227 ("stuck at disabled"): any status error used to show as DISABLED and failed toggles were
+    // silent, so a card detection/hardware problem looked like a Luma setting. Show what FS actually reports
+    Result toggleRes = 0;
+    bool toggled = false;
 
     do
     {
+        bool inserted = false, cardIfStatus = false;
+        Result insRes = FSUSER_CardSlotIsInserted(&inserted);
         Result res = FSUSER_CardSlotGetCardIFPowerStatus(&cardIfStatus);
-        if (R_FAILED(res)) cardIfStatus = false;
 
         Draw_Lock();
         Draw_DrawString(10, 10, COLOR_TITLE, "System configuration menu");
         u32 posY = Draw_DrawString(10, 30, COLOR_WHITE, "Press A to toggle, press B to go back.\n\n");
         posY = Draw_DrawString(10, posY, COLOR_WHITE, "Inserting or removing a card will reset the status,\nand you'll need to reinsert the cart if you want to\nplay it.\n\n");
+
+        Draw_DrawString(10, posY, COLOR_WHITE, "Card inserted:");
+        if (R_FAILED(insRes))
+            Draw_DrawFormattedString(100, posY, COLOR_RED, " error %08lx   ", (u32)insRes);
+        else
+            Draw_DrawString(100, posY, COLOR_WHITE, inserted ? " yes            " : " no             ");
+        posY += SPACING_Y;
+
         Draw_DrawString(10, posY, COLOR_WHITE, "Current status:");
-        Draw_DrawString(100, posY, !cardIfStatus ? COLOR_RED : COLOR_GREEN, !cardIfStatus ? " DISABLED" : " ENABLED ");
+        if (R_FAILED(res))
+            Draw_DrawFormattedString(100, posY, COLOR_RED, " UNKNOWN (%08lx)", (u32)res);
+        else
+            Draw_DrawString(100, posY, !cardIfStatus ? COLOR_RED : COLOR_GREEN, !cardIfStatus ? " DISABLED       " : " ENABLED        ");
+        posY += SPACING_Y;
+
+        if (toggled && R_FAILED(toggleRes))
+            Draw_DrawFormattedString(10, posY, COLOR_RED, "Toggle failed (%08lx).", (u32)toggleRes);
+        else
+            Draw_DrawString(10, posY, COLOR_WHITE, "                          ");
 
         Draw_FlushFramebuffer();
         Draw_Unlock();
@@ -552,13 +572,13 @@ void SysConfigMenu_ToggleCardIfPower(void)
 
         if(pressed & KEY_A)
         {
-            if (!cardIfStatus)
-                res = FSUSER_CardSlotPowerOn(&updatedCardIfStatus);
+            bool unused;
+            // If the status couldn't be read, try powering on: that's almost always what's wanted
+            if (R_SUCCEEDED(res) && cardIfStatus)
+                toggleRes = FSUSER_CardSlotPowerOff(&unused);
             else
-                res = FSUSER_CardSlotPowerOff(&updatedCardIfStatus);
-
-            if (R_SUCCEEDED(res))
-                cardIfStatus = !updatedCardIfStatus;
+                toggleRes = FSUSER_CardSlotPowerOn(&unused);
+            toggled = true;
         }
         else if(pressed & KEY_B)
             return;
