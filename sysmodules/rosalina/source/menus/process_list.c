@@ -774,6 +774,12 @@ void RosalinaMenu_ProcessList(void)
         }
         while(pressed == 0 && !menuShouldExit);
 
+        // The list can shrink while waiting for input (processes exiting): keep the selection on a real entry
+        if(processAmount <= 0)
+            break;
+        if(selected >= processAmount)
+            selected = processAmount - 1;
+
         if(pressed & KEY_B)
             break;
         else if(pressed & KEY_A)

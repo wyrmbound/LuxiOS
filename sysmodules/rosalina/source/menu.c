@@ -728,7 +728,7 @@ void menuShow(Menu *root)
             else
                 break;
         }
-        else if(pressed & KEY_Y)
+        else if((pressed & KEY_Y) && menuFramebufferActive) // nothing to restore if the framebuffer cache wasn't allocated
         {
             // Hold Y to peek at the game's bottom screen; the game stays paused (upstream request #2224)
             Draw_Lock();

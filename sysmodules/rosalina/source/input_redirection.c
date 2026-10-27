@@ -464,10 +464,14 @@ Result InputRedirection_Disable(s64 timeout)
 
 // Brings the hid/ir patches to the requested state (no-op for parts already there). It used to toggle, so
 // patch state and thread state could get out of sync and Start/Stop would invert (upstream #1431)
+static bool hidPatched = false;
+static bool irPatched = false;
+
 Result InputRedirection_DoOrUndoPatches(bool enable)
 {
-    static bool hidPatched = false;
-    static bool irPatched = false;
+    // Already in the requested state: don't freeze hid/ir or open them (e.g. on every shutdown when never used)
+    if (hidPatched == enable && (irPatched == enable || GET_VERSION_MINOR(osGetKernelVersion()) < 44))
+        return 0;
 
     Handle hidProcHandle = 0, irProcHandle = 0;
 
