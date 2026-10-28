@@ -70,6 +70,7 @@
 **Look and feel**
 - LuxiOS name in the boot config menu, chainloader, the in-game menu (formerly "Rosalina menu"), and the credits.
 - Gold menu titles, and **Luxi**, the mascot, on the credits screen.
+- An easter egg. Hint: a very famous cheat code, typed on the D-pad on the HOME Menu (then press A). Your best score is kept in `/luma/luxiflap.bin`.
 - Optional boot splash: copy `splash.bin` and `splashbottom.bin` from a release to `/luma/` on your SD card, then turn on *Splash* in the config menu.
 
 **Kept compatible:** the `/luma/` folder, `config.ini` format, service names and the `svcGetSystemInfo` interface are unchanged, so homebrew and existing settings keep working.

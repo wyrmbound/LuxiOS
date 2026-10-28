@@ -46,6 +46,7 @@ Open the menu (L+Down+Select) in **several different games**, including one 3D g
 - [ ] Plugins (.3gx) still load, and survive going to HOME Menu and back, and sleep.
 - [ ] InputRedirection: start, use, stop, start again; disconnect the PC client while holding a button: local buttons still work.
 - [ ] System configuration → Toggle power to card slot: shows "Card inserted" and status; a game card still works.
+- [ ] LuxiFlap: on the HOME Menu press Up Up Down Down Left Right Left Right B on the D-pad. The game opens on the bottom screen; A flaps, B quits back to the HOME Menu (which carries on where it was). The best score is still there after a reboot. L+Down+Select still opens the menu as usual.
 
 ## 5. Niche (only if you have them)
 

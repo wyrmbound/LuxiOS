@@ -40,6 +40,7 @@
 #include "minisoc.h"
 #include "plugin.h"
 #include "menus/screen_filters.h"
+#include "menus/luxi_flap.h"
 #include "shell.h"
 #include "pmdbgext.h"
 
@@ -374,11 +375,25 @@ void menuThreadMain(void)
 
     menuReadScreenTypes();
 
+    u32 ticks = 0;
     while(!preTerminationRequested)
     {
-        svcSleepThread(50 * 1000 * 1000LL);
+        // Keys are polled every 10 ms so quick taps of the Konami code aren't missed; the rest still runs every 50 ms
+        svcSleepThread(10 * 1000 * 1000LL);
         if (menuShouldExit)
             continue;
+
+        if (LuxiFlap_FeedKonami(scanHeldKeys()) && !g_blockMenuOpen)
+        {
+            menuEnter();
+            LuxiFlap_Run();
+            menuLeave();
+            continue;
+        }
+
+        if (++ticks < 5)
+            continue;
+        ticks = 0;
 
         Cheat_ApplyCheats();
 
